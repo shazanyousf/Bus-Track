@@ -40,12 +40,12 @@ class SocketService {
     required double speed,
   }) {
     _socket?.emit('driver:location', {
-      'busId':     busId,
-      'latitude':  latitude,
-      'longitude': longitude,
-      'speed':     speed,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
+  'busId': busId,
+  'lat': latitude,      // ✅ CHANGE HERE
+  'lng': longitude,     // ✅ CHANGE HERE
+  'speed': speed,
+  'timestamp': DateTime.now().toIso8601String(),
+});
   }
 
   /// Parent calls this to listen to a specific bus.
