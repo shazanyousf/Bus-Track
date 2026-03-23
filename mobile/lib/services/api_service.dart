@@ -1,0 +1,159 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+class ApiService {
+  static const Duration _timeout = Duration(seconds: 10);
+  
+  static String get baseUrl =>
+      dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:3000/api';
+
+  static Map<String, String> headers(String token) => {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+  // ── Buses ───────────────────────────────────────────────
+  static Future<List> getBuses({String? routeId}) async {
+    final query = routeId != null ? '?routeId=$routeId' : '';
+    final res = await http.get(Uri.parse('$baseUrl/buses$query')).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to load buses');
+  }
+
+  static Future<Map> addBus(String token, Map data) async {
+    final res = await http.post(Uri.parse('$baseUrl/buses'),
+        headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map> updateBus(String token, String id, Map data) async {
+    final res = await http.put(Uri.parse('$baseUrl/buses/$id'),
+        headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map> deleteBus(String token, String id) async {
+    final res = await http.delete(Uri.parse('$baseUrl/buses/$id'),
+        headers: headers(token)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  // ── Routes ──────────────────────────────────────────────
+  static Future<List> getRoutes() async {
+    final res = await http.get(Uri.parse('$baseUrl/routes')).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to load routes');
+  }
+
+  static Future<Map> addRoute(String token, Map data) async {
+    final res = await http.post(Uri.parse('$baseUrl/routes'),
+        headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map> updateRoute(String token, String id, Map data) async {
+    final res = await http.put(Uri.parse('$baseUrl/routes/$id'),
+        headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map> deleteRoute(String token, String id) async {
+    final res = await http.delete(Uri.parse('$baseUrl/routes/$id'),
+        headers: headers(token)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  // ── Drivers ─────────────────────────────────────────────
+  static Future<List> getDrivers(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/drivers'),
+        headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to load drivers');
+  }
+
+  static Future<Map> addDriver(String token, Map data) async {
+    final res = await http.post(Uri.parse('$baseUrl/drivers'),
+        headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map> deleteDriver(String token, String id) async {
+    final res = await http.delete(Uri.parse('$baseUrl/drivers/$id'),
+        headers: headers(token)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  // ── Registrations ────────────────────────────────────────
+  static Future<List> getRegistrations(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/registrations'),
+        headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to load registrations');
+  }
+
+  static Future<Map> submitRegistration(String token, Map data) async {
+    final res = await http.post(Uri.parse('$baseUrl/registrations'),
+        headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map> updateRegistrationStatus(
+      String token, String id, String status,
+      {String remarks = ''}) async {
+    final res = await http.put(
+        Uri.parse('$baseUrl/registrations/$id/status'),
+        headers: headers(token),
+        body: jsonEncode({'status': status, 'remarks': remarks})).timeout(_timeout);
+
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      final message = body['message'] ?? 'Failed to update registration status';
+      throw Exception(message);
+    }
+
+    return body;
+  }
+
+  // ── Students ─────────────────────────────────────────────
+  static Future<List> getStudents(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/students'),
+        headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to load students');
+  }
+
+  static Future<Map> addStudent(String token, Map data) async {
+    final res = await http.post(Uri.parse('$baseUrl/students'),
+        headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  // ── Auth ──────────────────────────────────────────────────
+  static Future<Map> forgotPassword(String email) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/auth/forgot-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    ).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map> verifyResetCode(String email, String resetCode) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/auth/verify-reset-code'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'resetCode': resetCode}),
+    ).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map> resetPassword(String email, String resetCode, String newPassword) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/auth/reset-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'resetCode': resetCode, 'newPassword': newPassword}),
+    ).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+}
