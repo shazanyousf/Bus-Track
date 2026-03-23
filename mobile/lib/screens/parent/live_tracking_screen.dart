@@ -86,8 +86,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         'BUS001';
 
     _socket.listenToBus(busId, (data) async {
-      final lat   = (data['latitude']  as num?)?.toDouble();
-      final lng   = (data['longitude'] as num?)?.toDouble();
+      final lat = (data['lat'] as num?)?.toDouble();
+      final lng = (data['lng'] as num?)?.toDouble();
       final speed = (data['speed']     as num?)?.toDouble() ?? 0;
 
       if (lat == null || lng == null) return;
