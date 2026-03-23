@@ -45,26 +45,30 @@ io.on('connection', (socket) => {
 
   // Driver sends their GPS location
   // Payload: { busId, latitude, longitude, speed }
-  socket.on('driver:location', (data) => {
-    if (!data.busId) return;
+ socket.on('driver:location', (data) => {
+  if (!data.busId) return;
 
-    activeBuses[data.busId] = {
-      ...data,
-      timestamp: new Date().toISOString(),
-    };
+  const formattedData = {
+    busId: data.busId,
+    lat: data.lat,
+    lng: data.lng,
+    speed: data.speed,
+    timestamp: new Date().toISOString(),
+  };
 
-    // Broadcast to all parents watching this bus
-    io.emit(`bus:location:${data.busId}`, activeBuses[data.busId]);
+  activeBuses[data.busId] = formattedData;
 
-    console.log(`🚌 Bus ${data.busId} → lat:${data.latitude?.toFixed(4)} lng:${data.longitude?.toFixed(4)} speed:${data.speed?.toFixed(0)}km/h`);
-  });
+  io.emit(`bus:location:${data.busId}`, formattedData);
+
+  console.log(`🚌 Bus ${data.busId} → lat:${data.lat?.toFixed(4)} lng:${data.lng?.toFixed(4)} speed:${data.speed?.toFixed(0)}km/h`);
+});
 
   // Client can request last known position on connect
-  socket.on('bus:request:${busId}', (busId) => {
-    if (activeBuses[busId]) {
-      socket.emit(`bus:location:${busId}`, activeBuses[busId]);
-    }
-  });
+  socket.on('bus:request', (busId) => {
+  if (activeBuses[busId]) {
+    socket.emit(`bus:location:${busId}`, activeBuses[busId]);
+  }
+});
 
   socket.on('disconnect', () => {
     console.log(`📴 Client disconnected: ${socket.id}`);
@@ -73,19 +77,20 @@ io.on('connection', (socket) => {
 
 // ── Demo simulation (remove in production) ──────────────────────────────────
 // Simulates BUS001 moving in a circle so you can test without a real driver
-let angle = 0;
-setInterval(() => {
-  angle += 0.015;
-  const data = {
-    busId:     'DEMO_BUS',
-    latitude:  24.8607 + Math.sin(angle) * 0.008,
-    longitude: 67.0011 + Math.cos(angle) * 0.008,
-    speed:     Math.round(25 + Math.random() * 20),
-    timestamp: new Date().toISOString(),
-  };
-  activeBuses['DEMO_BUS'] = data;
-  io.emit('bus:location:DEMO_BUS', data);
-}, 2000);
+
+// let angle = 0;
+// setInterval(() => {
+//   angle += 0.015;
+//   const data = {
+//     busId:     'DEMO_BUS',                           //just checking
+//     latitude:  24.8607 + Math.sin(angle) * 0.008,
+//     longitude: 67.0011 + Math.cos(angle) * 0.008,
+//     speed:     Math.round(25 + Math.random() * 20),
+//     timestamp: new Date().toISOString(),
+//   };
+//   activeBuses['DEMO_BUS'] = data;
+//   io.emit('bus:location:DEMO_BUS', data);
+// }, 2000);
 
 // ── MongoDB + Start ──────────────────────────────────────────────────────────
 const PORT      = process.env.PORT     || 3000;
