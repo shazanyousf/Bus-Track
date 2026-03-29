@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiService {
-  static const Duration _timeout = Duration(seconds: 10);
+  static const Duration _timeout = Duration(seconds: 20);
   
   static String get baseUrl =>
       dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:3000/api';

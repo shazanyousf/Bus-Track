@@ -29,14 +29,17 @@ class AuthService extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
+      final url = Uri.parse('$baseUrl/auth/login');
+      debugPrint('Auth login URL: $url');
       final res = await http.post(
-        Uri.parse('$baseUrl/auth/login'),
+        url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       ).timeout(
-        const Duration(seconds: 10),
+        const Duration(seconds: 20),
         onTimeout: () => throw Exception('Request timeout. Server not responding'),
       );
+      debugPrint('Auth login response: ${res.statusCode} ${res.body}');
       final data = jsonDecode(res.body);
       if (res.statusCode == 200) {
         _token = data['token'];
@@ -47,14 +50,14 @@ class AuthService extends ChangeNotifier {
         notifyListeners();
         return {'success': true};
       }
-      return {'success': false, 'message': data['message']};
+      return {'success': false, 'message': data['message'] ?? 'Server returned ${res.statusCode}'};
     } catch (e) {
       final message = e.toString();
       debugPrint('Auth login error: $message');
       return {
         'success': false,
         'message': message.contains('timeout')
-            ? 'Connection timeout. Check if server is running at $baseUrl'
+            ? 'Connection timeout. The Railway backend may be waking from sleep or not reachable at $baseUrl'
             : 'Connection error: $message',
       };
     } finally {
@@ -77,7 +80,7 @@ class AuthService extends ChangeNotifier {
           'role': 'parent'
         }),
       ).timeout(
-        const Duration(seconds: 10),
+        const Duration(seconds: 20),
         onTimeout: () => throw Exception('Request timeout'),
       );
       final data = jsonDecode(res.body);
