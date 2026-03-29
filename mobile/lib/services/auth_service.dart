@@ -49,11 +49,13 @@ class AuthService extends ChangeNotifier {
       }
       return {'success': false, 'message': data['message']};
     } catch (e) {
+      final message = e.toString();
+      debugPrint('Auth login error: $message');
       return {
         'success': false,
-        'message': e.toString().contains('timeout')
+        'message': message.contains('timeout')
             ? 'Connection timeout. Check if server is running at $baseUrl'
-            : 'Connection error. Is the server running?'
+            : 'Connection error: $message',
       };
     } finally {
       _isLoading = false;

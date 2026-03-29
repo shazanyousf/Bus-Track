@@ -42,14 +42,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Future<void> _loadData() async {
     try {
       final auth = context.read<AuthService>();
-      final results = await Future.wait([
+      final results = await Future.wait<dynamic>([
         ApiService.getBuses(),
         ApiService.getRoutes(),
         ApiService.getSettings(auth.token!),
       ]);
       setState(() {
-        _buses  = results[0];
-        _routes = results[1];
+        _buses  = results[0] as List;
+        _routes = results[1] as List;
         final settings = results[2] as Map;
         _departments = List<String>.from(settings['departments'] ?? []);
         _semesters = List<String>.from(settings['semesters'] ?? []);

@@ -32,7 +32,15 @@ app.use('/api/buses',         require('./routes/buses'));
 app.use('/api/drivers',       require('./routes/drivers'));
 app.use('/api/registrations', require('./routes/registrations'));
 app.use('/api/routes',        require('./routes/busRoutes'));
+app.use('/api/settings',      require('./routes/settings'));
 app.use('/api/students',      require('./routes/students'));
+
+app.get('/api', (req, res) =>
+  res.json({
+    message: 'BusTrack University API is running',
+    routes: ['/api/auth', '/api/buses', '/api/drivers', '/api/routes', '/api/registrations', '/api/settings', '/api/students']
+  })
+);
 
 app.get('/', (req, res) =>
   res.json({ message: 'BusTrack University API ✅', version: '2.0' }));

@@ -126,8 +126,10 @@ class _AdminBusesScreenState extends State<AdminBusesScreen> {
   Future<void> _showEditBusDialog(Map bus) async {
     final numCtrl   = TextEditingController(text: bus['busNumber'] ?? '');
     final seatsCtrl = TextEditingController(text: '${bus['totalSeats'] ?? ''}');
-    String? selectedRouteId = (bus['routeId'] is Map ? bus['routeId']?['_id'] : bus['routeId']) as String?;
-    String? selectedDriverId = (bus['driverId'] is Map ? bus['driverId']?['_id'] : bus['driverId']) as String?;
+    final routeValue = bus['routeId'];
+    final driverValue = bus['driverId'];
+    String? selectedRouteId = routeValue is Map ? routeValue['_id'] as String? : routeValue as String?;
+    String? selectedDriverId = driverValue is Map ? driverValue['_id'] as String? : driverValue as String?;
 
     await showModalBottomSheet(
       context: context,
