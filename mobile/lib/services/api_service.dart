@@ -101,7 +101,12 @@ class ApiService {
   static Future<Map> updateSettings(String token, Map data) async {
     final res = await http.put(Uri.parse('$baseUrl/settings'),
         headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
-    return jsonDecode(res.body);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      final message = body['message'] ?? 'Failed to update settings';
+      throw Exception(message);
+    }
+    return body;
   }
 
   // ── Registrations ────────────────────────────────────────
@@ -115,7 +120,12 @@ class ApiService {
   static Future<Map> submitRegistration(String token, Map data) async {
     final res = await http.post(Uri.parse('$baseUrl/registrations'),
         headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
-    return jsonDecode(res.body);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 201) {
+      final message = body['message'] ?? 'Failed to submit registration';
+      throw Exception(message);
+    }
+    return body;
   }
 
   static Future<Map> updateRegistrationStatus(

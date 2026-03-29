@@ -53,10 +53,10 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           backgroundColor: Colors.green,
         ));
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Failed to save settings'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to save settings: $e'),
           backgroundColor: Colors.red,
         ));
       }

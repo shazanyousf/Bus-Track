@@ -70,6 +70,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Future<void> _submit() async {
     if (_selectedBus == null) return;
+    if (_nameCtrl.text.trim().isEmpty || _idCtrl.text.trim().isEmpty ||
+        _selectedDept == null || _selectedSemester == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please complete all student fields before submitting'),
+          backgroundColor: Colors.orange,
+        ));
+      }
+      return;
+    }
+
     setState(() => _loading = true);
     final auth = context.read<AuthService>();
     try {

@@ -21,16 +21,31 @@ router.post('/', auth, async (req, res) => {
     if (!bus) return res.status(404).json({ message: 'Bus not found' });
     if (bus.availableSeats <= 0) return res.status(400).json({ message: 'No seats available' });
     
-    // Create student first
-    const student = await Student.create({
+    // Create or update the student record first
+    const studentData = {
       name: req.body.studentData.name,
       studentId: req.body.studentData.studentId,
       department: req.body.studentData.department,
       semester: req.body.studentData.semester,
       phone: req.body.studentData.phone,
       parentId: req.user.id
+    };
+
+    let student = await Student.findOne({
+      studentId: req.body.studentData.studentId,
+      parentId: req.user.id
     });
-    
+
+    if (student) {
+      student.name = studentData.name;
+      student.department = studentData.department;
+      student.semester = studentData.semester;
+      student.phone = studentData.phone;
+      await student.save();
+    } else {
+      student = await Student.create(studentData);
+    }
+
     // Create registration with the student ID
     const reg = await Registration.create({
       studentId: student._id,

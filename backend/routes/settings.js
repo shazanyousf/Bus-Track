@@ -21,17 +21,19 @@ router.get('/', async (req, res) => {
 // Admin updates the available departments and semesters.
 router.put('/', auth, auth.adminOnly, async (req, res) => {
   try {
-    const payload = {
-      departments: Array.isArray(req.body.departments) ? req.body.departments : [],
-      semesters:   Array.isArray(req.body.semesters) ? req.body.semesters : [],
-    };
+    const updates = {};
+    if (Array.isArray(req.body.departments)) updates.departments = req.body.departments;
+    if (Array.isArray(req.body.semesters)) updates.semesters = req.body.semesters;
 
     let settings = await Setting.findOne();
     if (!settings) {
-      settings = await Setting.create(payload);
+      settings = await Setting.create({
+        departments: updates.departments || ['Computer Science', 'Software Engineering', 'Electrical Engineering', 'Mechanical Engineering'],
+        semesters: updates.semesters || ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'],
+      });
     } else {
-      settings.departments = payload.departments;
-      settings.semesters = payload.semesters;
+      if (updates.departments) settings.departments = updates.departments;
+      if (updates.semesters) settings.semesters = updates.semesters;
       await settings.save();
     }
     res.json(settings);
