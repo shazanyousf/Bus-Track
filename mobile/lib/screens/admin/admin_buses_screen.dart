@@ -123,6 +123,87 @@ class _AdminBusesScreenState extends State<AdminBusesScreen> {
     );
   }
 
+  Future<void> _showEditBusDialog(Map bus) async {
+    final numCtrl   = TextEditingController(text: bus['busNumber'] ?? '');
+    final seatsCtrl = TextEditingController(text: '${bus['totalSeats'] ?? ''}');
+    String? selectedRouteId = (bus['routeId'] is Map ? bus['routeId']?['_id'] : bus['routeId']) as String?;
+    String? selectedDriverId = (bus['driverId'] is Map ? bus['driverId']?['_id'] : bus['driverId']) as String?;
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF16213E),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Edit Bus',
+                  style: TextStyle(
+                      color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 20),
+              _SheetField(ctrl: numCtrl, label: 'Bus Number', hint: 'e.g. BUS-005'),
+              const SizedBox(height: 12),
+              _SheetField(ctrl: seatsCtrl, label: 'Total Seats', hint: 'e.g. 40', type: TextInputType.number),
+              const SizedBox(height: 12),
+              _SheetDropdown(
+                label: 'Route',
+                value: selectedRouteId,
+                items: _routes.map((r) => DropdownMenuItem(
+                  value: r['_id'] as String,
+                  child: Text(r['routeName'] ?? '', style: const TextStyle(color: Colors.white)),
+                )).toList(),
+                onChanged: (v) => setLocal(() => selectedRouteId = v),
+              ),
+              const SizedBox(height: 12),
+              _SheetDropdown(
+                label: 'Driver',
+                value: selectedDriverId,
+                items: _drivers.map((d) => DropdownMenuItem(
+                  value: d['_id'] as String,
+                  child: Text(d['name'] ?? '', style: const TextStyle(color: Colors.white)),
+                )).toList(),
+                onChanged: (v) => setLocal(() => selectedDriverId = v),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final auth = context.read<AuthService>();
+                    final seats = int.tryParse(seatsCtrl.text) ?? bus['totalSeats'] ?? 0;
+                    await ApiService.updateBus(auth.token!, bus['_id'] as String, {
+                      'busNumber':      numCtrl.text.trim(),
+                      'totalSeats':     seats,
+                      'availableSeats': bus['availableSeats'] ?? seats,
+                      'routeId':        selectedRouteId,
+                      'driverId':       selectedDriverId,
+                    });
+                    Navigator.pop(ctx);
+                    _load();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A9EFF),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: const Text('Save Changes',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _deleteBus(String id) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -221,6 +302,11 @@ class _AdminBusesScreenState extends State<AdminBusesScreen> {
                                                 color: Color(0xFF8892A4), fontSize: 12)),
                                       ],
                                     ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () => _showEditBusDialog(bus),
+                                    icon: const Icon(Icons.edit_outlined,
+                                        color: Color(0xFF4A9EFF), size: 20),
                                   ),
                                   IconButton(
                                     onPressed: () => _deleteBus(bus['_id'] as String),

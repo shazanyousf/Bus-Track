@@ -96,6 +96,72 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
     );
   }
 
+  Future<void> _showEditDriverDialog(Map driver) async {
+    final nameCtrl    = TextEditingController(text: driver['name'] ?? '');
+    final phoneCtrl   = TextEditingController(text: driver['phone'] ?? '');
+    final licenseCtrl = TextEditingController(text: driver['licenseNo'] ?? '');
+    final expCtrl     = TextEditingController(text: '${driver['experience'] ?? 0}');
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF16213E),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Edit Driver',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800)),
+            const SizedBox(height: 20),
+            _buildField(nameCtrl,    'Full Name',      'e.g. Ahmed Ali'),
+            const SizedBox(height: 12),
+            _buildField(phoneCtrl,   'Phone Number',   '+92-300-0000000', type: TextInputType.phone),
+            const SizedBox(height: 12),
+            _buildField(licenseCtrl, 'License Number', 'e.g. LHR-2021-001'),
+            const SizedBox(height: 12),
+            _buildField(expCtrl,     'Experience (years)', 'e.g. 5', type: TextInputType.number),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () async {
+                  final auth = context.read<AuthService>();
+                  await ApiService.updateDriver(auth.token!, driver['_id'] as String,
+                      {
+                    'name':       nameCtrl.text.trim(),
+                    'phone':      phoneCtrl.text.trim(),
+                    'licenseNo':  licenseCtrl.text.trim(),
+                    'experience': int.tryParse(expCtrl.text) ?? 0,
+                  });
+                  Navigator.pop(ctx);
+                  _load();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4A9EFF),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: const Text('Save Driver',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildField(TextEditingController ctrl, String label, String hint,
       {TextInputType? type}) {
     return Column(
@@ -262,6 +328,13 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
                                                   fontSize: 11)),
                                         ],
                                       ),
+                                    ),
+                                    IconButton(
+                                      onPressed: () => _showEditDriverDialog(d),
+                                      icon: const Icon(
+                                          Icons.edit_outlined,
+                                          color: Color(0xFF4A9EFF),
+                                          size: 20),
                                     ),
                                     IconButton(
                                       onPressed: () => _deleteDriver(

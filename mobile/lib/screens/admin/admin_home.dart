@@ -7,6 +7,7 @@ import 'admin_buses_screen.dart';
 import 'admin_requests_screen.dart';
 import 'admin_drivers_screen.dart';
 import 'admin_routes_screen.dart';
+import 'admin_settings_screen.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
@@ -188,6 +189,34 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     _StatCard(label: 'Drivers',        value: '${_drivers.length}',        color: const Color(0xFF4A9EFF), icon: Icons.person_rounded),
                     _StatCard(label: 'Total Requests', value: '${_registrations.length}',  color: const Color(0xFF2ECC71), icon: Icons.assignment_rounded),
                   ],
+                ),
+                const SizedBox(height: 24),
+
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),
+                  ),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16213E),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFF2A3A5C)),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.settings_rounded, color: Color(0xFFFF6B35), size: 24),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text('Manage Departments & Semesters',
+                              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                        ),
+                        Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF8892A4), size: 16),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
 

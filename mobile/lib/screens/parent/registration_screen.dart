@@ -27,13 +27,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _loading = false;
   bool _submitted = false;
 
-  final _departments = [
-    'Computer Science', 'Software Engineering', 'Electrical Engineering',
-    'Mechanical Engineering', 'Business Administration', 'Medicine',
-    'Law', 'Architecture', 'Mathematics', 'Physics',
-  ];
-
-  final _semesters = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+  List<String> _departments = [];
+  List<String> _semesters = [];
 
   @override
   void initState() {
@@ -46,15 +41,31 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Future<void> _loadData() async {
     try {
+      final auth = context.read<AuthService>();
       final results = await Future.wait([
         ApiService.getBuses(),
         ApiService.getRoutes(),
+        ApiService.getSettings(auth.token!),
       ]);
       setState(() {
         _buses  = results[0];
         _routes = results[1];
+        final settings = results[2] as Map;
+        _departments = List<String>.from(settings['departments'] ?? []);
+        _semesters = List<String>.from(settings['semesters'] ?? []);
       });
-    } catch (_) {}
+    } catch (_) {
+      if (_departments.isEmpty) {
+        _departments = [
+          'Computer Science', 'Software Engineering', 'Electrical Engineering',
+          'Mechanical Engineering', 'Business Administration', 'Medicine',
+          'Law', 'Architecture', 'Mathematics', 'Physics',
+        ];
+      }
+      if (_semesters.isEmpty) {
+        _semesters = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+      }
+    }
   }
 
   Future<void> _submit() async {

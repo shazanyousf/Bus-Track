@@ -56,7 +56,9 @@ class _ParentHomeState extends State<ParentHome> {
         onRegister: () => setState(() => _currentIndex = 2),
         onViewBuses: () => setState(() => _currentIndex = 1),
       ),
-      const BusListScreen(),
+      approved.isNotEmpty
+          ? _AssignedBusPage(registration: approved.first)
+          : const BusListScreen(),
       RegistrationScreen(onDone: () => setState(() => _currentIndex = 0)),
       const MyRegistrationsScreen(),
     ];
@@ -195,7 +197,7 @@ class _DashboardTab extends StatelessWidget {
                   Expanded(
                     child: _ActionButton(
                       icon: Icons.directions_bus_rounded,
-                      label: 'View Buses',
+                      label: approved.isNotEmpty ? 'My Bus' : 'View Buses',
                       color: const Color(0xFF4A9EFF),
                       onTap: onViewBuses,
                     ),
@@ -442,6 +444,153 @@ class _AssignedBusCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AssignedBusPage extends StatelessWidget {
+  final Map registration;
+  const _AssignedBusPage({required this.registration});
+
+  Map _safeMap(dynamic value) {
+    if (value is Map) return value as Map;
+    return {};
+  }
+
+  void _trackBus(Map bus, BuildContext context) {
+    final busId = bus['_id'] ?? bus['busNumber'];
+    if (busId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Bus ID unavailable for tracking'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => LiveTrackingScreen(bus: bus)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bus    = _safeMap(registration['busId']);
+    final route  = _safeMap(registration['routeId']).isNotEmpty
+        ? _safeMap(registration['routeId'])
+        : _safeMap(bus['routeId']);
+    final driver = _safeMap(bus['driverId']);
+    final stops  = (route['stops'] as List?) ?? [];
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.directions_bus_rounded, color: Color(0xFFFF6B35), size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(bus['busNumber'] ?? 'My Bus',
+                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Text('Route: ${route['routeName'] ?? 'N/A'}',
+                          style: const TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
+                      Text('Code: ${bus['busNumber'] ?? 'N/A'}',
+                          style: const TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16213E),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFF2A3A5C)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Driver', style: TextStyle(color: Color(0xFF8892A4), fontSize: 12)),
+                  const SizedBox(height: 10),
+                  Text(driver['name'] ?? 'Not assigned', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                  if (driver['phone'] != null && driver['phone'].toString().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(driver['phone'], style: const TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (stops.isNotEmpty) ...[
+              const Text('Route Stops', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              ...List.generate(stops.length, (i) {
+                final stop = stops[i] as Map;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16213E),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF2A3A5C)),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: const Color(0xFF4A9EFF).withOpacity(0.2),
+                        child: Text('${i + 1}', style: const TextStyle(color: Colors.white)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(stop['name'] ?? 'Stop', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ] else ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16213E),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFF2A3A5C)),
+                ),
+                child: const Text('Route stops are not configured yet. Please contact the admin.',
+                    style: TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
+              ),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () => _trackBus(bus, context),
+                icon: const Icon(Icons.location_on_rounded),
+                label: const Text('Track Assigned Bus'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4A9EFF),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

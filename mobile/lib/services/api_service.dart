@@ -78,9 +78,29 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map> updateDriver(String token, String id, Map data) async {
+    final res = await http.put(Uri.parse('$baseUrl/drivers/$id'),
+        headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
   static Future<Map> deleteDriver(String token, String id) async {
     final res = await http.delete(Uri.parse('$baseUrl/drivers/$id'),
         headers: headers(token)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  // ── Settings ─────────────────────────────────────────────
+  static Future<Map> getSettings(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/settings'),
+        headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to load settings');
+  }
+
+  static Future<Map> updateSettings(String token, Map data) async {
+    final res = await http.put(Uri.parse('$baseUrl/settings'),
+        headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
     return jsonDecode(res.body);
   }
 

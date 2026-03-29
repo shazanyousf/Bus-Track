@@ -37,6 +37,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
     final nameCtrl = TextEditingController();
     final codeCtrl = TextEditingController();
     final descCtrl = TextEditingController();
+    final stopsCtrl = TextEditingController();
 
     await showModalBottomSheet(
       context: context,
@@ -65,6 +66,13 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
               hint: 'e.g. Main downtown route',
               maxLines: 3,
             ),
+            const SizedBox(height: 12),
+            _SheetField(
+              ctrl: stopsCtrl,
+              label: 'Stops',
+              hint: 'Enter each stop on a new line: Name,latitude,longitude',
+              maxLines: 5,
+            ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -76,7 +84,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                     'routeName': nameCtrl.text.trim(),
                     'routeCode': codeCtrl.text.trim(),
                     'description': descCtrl.text.trim(),
-                    'stops': [],
+                    'stops': _parseStops(stopsCtrl.text),
                   });
                   Navigator.pop(ctx);
                   _load();
@@ -96,10 +104,38 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
     );
   }
 
+  List<Map<String, dynamic>> _parseStops(String rawText) {
+    return rawText
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .map((line) {
+          final parts = line.split(',').map((p) => p.trim()).toList();
+          return {
+            'name': parts.isNotEmpty ? parts[0] : 'Stop',
+            'latitude': parts.length > 1 ? double.tryParse(parts[1]) ?? 0.0 : 0.0,
+            'longitude': parts.length > 2 ? double.tryParse(parts[2]) ?? 0.0 : 0.0,
+            'order':  parts.length > 3 ? int.tryParse(parts[3]) ?? 0 : 0,
+          };
+        })
+        .toList();
+  }
+
+  String _stopsTextForRoute(Map route) {
+    final stops = (route['stops'] as List?) ?? [];
+    return stops.map((stop) {
+      final s = stop as Map;
+      final lat = (s['latitude'] as num?)?.toString() ?? '0.0';
+      final lng = (s['longitude'] as num?)?.toString() ?? '0.0';
+      return '${s['name'] ?? 'Stop'},$lat,$lng';
+    }).join('\n');
+  }
+
   Future<void> _showEditRouteDialog(Map route) async {
     final nameCtrl = TextEditingController(text: route['routeName'] ?? '');
     final codeCtrl = TextEditingController(text: route['routeCode'] ?? '');
     final descCtrl = TextEditingController(text: route['description'] ?? '');
+    final stopsCtrl = TextEditingController(text: _stopsTextForRoute(route));
 
     await showModalBottomSheet(
       context: context,
@@ -123,6 +159,13 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
             _SheetField(ctrl: codeCtrl, label: 'Route Code'),
             const SizedBox(height: 12),
             _SheetField(ctrl: descCtrl, label: 'Description', maxLines: 3),
+            const SizedBox(height: 12),
+            _SheetField(
+              ctrl: stopsCtrl,
+              label: 'Stops',
+              hint: 'Name,latitude,longitude on each line',
+              maxLines: 5,
+            ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -134,6 +177,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                     'routeName': nameCtrl.text.trim(),
                     'routeCode': codeCtrl.text.trim(),
                     'description': descCtrl.text.trim(),
+                    'stops': _parseStops(stopsCtrl.text),
                   });
                   Navigator.pop(ctx);
                   _load();
@@ -225,6 +269,8 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                           children: [
                             const SizedBox(height: 4),
                             Text('Code: ${route['routeCode'] ?? ''}',
+                                style: const TextStyle(color: Color(0xFF8892A4), fontSize: 12)),
+                            Text('Stops: ${(route['stops'] as List?)?.length ?? 0}',
                                 style: const TextStyle(color: Color(0xFF8892A4), fontSize: 12)),
                             if (route['description'] != null && route['description'].isNotEmpty)
                               Padding(

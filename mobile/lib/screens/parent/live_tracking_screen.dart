@@ -120,6 +120,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         );
       });
     });
+
+    _socket.requestBusLocation(busId);
   }
 
   String _formatTime(String? iso) {

@@ -57,6 +57,11 @@ class SocketService {
     });
   }
 
+  /// Request the current known position for a bus from the server.
+  void requestBusLocation(String busId) {
+    _socket?.emit('bus:request', busId);
+  }
+
   /// Stop listening to a bus (call when leaving the tracking screen).
   void stopListening(String busId) {
     _socket?.off('bus:location:$busId');
