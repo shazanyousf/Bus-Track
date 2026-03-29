@@ -48,7 +48,9 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
           content: Text('Request $status successfully'),
           backgroundColor: status == 'approved'
               ? const Color(0xFF2ECC71)
-              : const Color(0xFFE74C3C),
+              : status == 'cancelled'
+                  ? const Color(0xFFF7C948)
+                  : const Color(0xFFE74C3C),
         ));
       }
     } catch (e) {
@@ -133,7 +135,7 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
                   height: 34,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
-                    children: ['all', 'pending', 'approved', 'rejected']
+                    children: ['all', 'pending', 'approved', 'rejected', 'cancelled']
                         .map((f) => GestureDetector(
                               onTap: () => setState(() => _filter = f),
                               child: Container(
@@ -257,55 +259,80 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
                                             text: route['routeName'] ?? 'N/A'),
                                       ],
                                     ),
-                                    if (status == 'pending') ...[
+                                    if (status == 'pending' || status == 'approved') ...[
                                       const SizedBox(height: 14),
                                       Row(
                                         children: [
-                                          Expanded(
-                                            child: ElevatedButton.icon(
-                                              onPressed: () => _updateStatus(
-                                                  reg['_id'] as String, 'approved'),
-                                              icon: const Icon(Icons.check_rounded,
-                                                  size: 16),
-                                              label: const Text('Approve'),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color(0xFF2ECC71)
-                                                    .withOpacity(0.15),
-                                                foregroundColor:
-                                                    const Color(0xFF2ECC71),
-                                                elevation: 0,
-                                                side: const BorderSide(
-                                                    color: Color(0xFF2ECC71),
-                                                    width: 0.5),
-                                                shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(10)),
+                                          if (status == 'pending') ...[
+                                            Expanded(
+                                              child: ElevatedButton.icon(
+                                                onPressed: () => _updateStatus(
+                                                    reg['_id'] as String, 'approved'),
+                                                icon: const Icon(Icons.check_rounded,
+                                                    size: 16),
+                                                label: const Text('Approve'),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(0xFF2ECC71)
+                                                      .withOpacity(0.15),
+                                                  foregroundColor:
+                                                      const Color(0xFF2ECC71),
+                                                  elevation: 0,
+                                                  side: const BorderSide(
+                                                      color: Color(0xFF2ECC71),
+                                                      width: 0.5),
+                                                  shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(10)),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: ElevatedButton.icon(
-                                              onPressed: () =>
-                                                  _showRejectDialog(reg['_id'] as String),
-                                              icon: const Icon(Icons.close_rounded,
-                                                  size: 16),
-                                              label: const Text('Reject'),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color(0xFFE74C3C)
-                                                    .withOpacity(0.1),
-                                                foregroundColor:
-                                                    const Color(0xFFE74C3C),
-                                                elevation: 0,
-                                                side: const BorderSide(
-                                                    color: Color(0xFFE74C3C),
-                                                    width: 0.5),
-                                                shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(10)),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: ElevatedButton.icon(
+                                                onPressed: () =>
+                                                    _showRejectDialog(reg['_id'] as String),
+                                                icon: const Icon(Icons.close_rounded,
+                                                    size: 16),
+                                                label: const Text('Reject'),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(0xFFE74C3C)
+                                                      .withOpacity(0.1),
+                                                  foregroundColor:
+                                                      const Color(0xFFE74C3C),
+                                                  elevation: 0,
+                                                  side: const BorderSide(
+                                                      color: Color(0xFFE74C3C),
+                                                      width: 0.5),
+                                                  shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(10)),
+                                                ),
                                               ),
                                             ),
-                                          ),
+                                          ] else ...[
+                                            Expanded(
+                                              child: ElevatedButton.icon(
+                                                onPressed: () => _updateStatus(
+                                                    reg['_id'] as String, 'cancelled'),
+                                                icon: const Icon(Icons.cancel_rounded,
+                                                    size: 16),
+                                                label: const Text('Cancel'),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(0xFFF7C948)
+                                                      .withOpacity(0.15),
+                                                  foregroundColor:
+                                                      const Color(0xFFF7C948),
+                                                  elevation: 0,
+                                                  side: const BorderSide(
+                                                      color: Color(0xFFF7C948),
+                                                      width: 0.5),
+                                                  shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(10)),
+                                                ),
+                                              ),
+                                            ),
+                                          ]
                                         ],
                                       ),
                                     ],

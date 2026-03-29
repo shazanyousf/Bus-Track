@@ -503,8 +503,11 @@ class _AssignedBusPage extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text('Route: ${route['routeName'] ?? 'N/A'}',
                           style: const TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
-                      Text('Code: ${bus['busNumber'] ?? 'N/A'}',
+                      Text('Bus Code: ${bus['busNumber'] ?? 'N/A'}',
                           style: const TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
+                      if (route['routeCode'] != null && route['routeCode'].toString().isNotEmpty)
+                        Text('Route Code: ${route['routeCode']}',
+                            style: const TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
                     ],
                   ),
                 ),

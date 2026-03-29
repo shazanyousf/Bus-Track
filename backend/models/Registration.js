@@ -5,7 +5,7 @@ const registrationSchema = new mongoose.Schema({
   parentId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   busId:        { type: mongoose.Schema.Types.ObjectId, ref: 'Bus', required: true },
   routeId:      { type: mongoose.Schema.Types.ObjectId, ref: 'Route', required: true },
-  status:       { type: String, enum: ['pending','approved','rejected'], default: 'pending' },
+  status:       { type: String, enum: ['pending','approved','rejected','cancelled'], default: 'pending' },
   requestDate:  { type: Date, default: Date.now },
   reviewedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   reviewedAt:   { type: Date, default: null },

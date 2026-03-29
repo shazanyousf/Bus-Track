@@ -49,17 +49,38 @@ router.post('/', auth, async (req, res) => {
 router.put('/:id/status', auth, auth.adminOnly, async (req, res) => {
   try {
     const { status, remarks } = req.body;
-    const reg = await Registration.findByIdAndUpdate(
-      req.params.id,
-      { status, remarks, reviewedBy: req.user.id, reviewedAt: new Date() },
-      { new: true }
-    ).populate('busId');
+    const reg = await Registration.findById(req.params.id).populate('busId');
+    if (!reg) return res.status(404).json({ message: 'Registration not found' });
 
-    // Decrease available seats on approval
-    if (status === 'approved' && reg.busId) {
-      await Bus.findByIdAndUpdate(reg.busId._id, { $inc: { availableSeats: -1 } });
+    const previousStatus = reg.status;
+    const bus = reg.busId;
+
+    if (status === 'approved' && previousStatus !== 'approved') {
+      if (bus && bus.availableSeats <= 0) {
+        return res.status(400).json({ message: 'No seats available for this bus' });
+      }
+      if (bus) {
+        await Bus.findByIdAndUpdate(bus._id, { $inc: { availableSeats: -1 } });
+      }
     }
-    res.json(reg);
+
+    if (previousStatus === 'approved' && status !== 'approved' && bus) {
+      await Bus.findByIdAndUpdate(bus._id, { $inc: { availableSeats: 1 } });
+    }
+
+    reg.status = status;
+    reg.remarks = remarks || reg.remarks;
+    reg.reviewedBy = req.user.id;
+    reg.reviewedAt = new Date();
+    await reg.save();
+
+    const populated = await Registration.findById(reg._id)
+      .populate('studentId')
+      .populate('busId')
+      .populate('routeId')
+      .populate('parentId', 'name email');
+
+    res.json(populated);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 

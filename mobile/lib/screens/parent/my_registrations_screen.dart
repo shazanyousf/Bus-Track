@@ -33,9 +33,10 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
 
   Color _statusColor(String s) {
     switch (s) {
-      case 'approved': return const Color(0xFF2ECC71);
-      case 'rejected': return const Color(0xFFE74C3C);
-      default:         return const Color(0xFFF7C948);
+      case 'approved':  return const Color(0xFF2ECC71);
+      case 'rejected':  return const Color(0xFFE74C3C);
+      case 'cancelled': return const Color(0xFFF7C948);
+      default:          return const Color(0xFFF7C948);
     }
   }
 

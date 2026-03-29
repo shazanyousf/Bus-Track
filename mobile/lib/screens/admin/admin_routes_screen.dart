@@ -36,7 +36,6 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
   Future<void> _showAddRouteDialog() async {
     final nameCtrl = TextEditingController();
     final codeCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
     final stopsCtrl = TextEditingController();
 
     await showModalBottomSheet(
@@ -61,13 +60,6 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
             _SheetField(ctrl: codeCtrl, label: 'Route Code', hint: 'e.g. RT-001'),
             const SizedBox(height: 12),
             _SheetField(
-              ctrl: descCtrl,
-              label: 'Description',
-              hint: 'e.g. Main downtown route',
-              maxLines: 3,
-            ),
-            const SizedBox(height: 12),
-            _SheetField(
               ctrl: stopsCtrl,
               label: 'Stops',
               hint: 'Enter each stop on a new line: Name,latitude,longitude',
@@ -83,7 +75,6 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                   await ApiService.addRoute(auth.token!, {
                     'routeName': nameCtrl.text.trim(),
                     'routeCode': codeCtrl.text.trim(),
-                    'description': descCtrl.text.trim(),
                     'stops': _parseStops(stopsCtrl.text),
                   });
                   Navigator.pop(ctx);
@@ -134,7 +125,6 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
   Future<void> _showEditRouteDialog(Map route) async {
     final nameCtrl = TextEditingController(text: route['routeName'] ?? '');
     final codeCtrl = TextEditingController(text: route['routeCode'] ?? '');
-    final descCtrl = TextEditingController(text: route['description'] ?? '');
     final stopsCtrl = TextEditingController(text: _stopsTextForRoute(route));
 
     await showModalBottomSheet(
@@ -158,8 +148,6 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
             const SizedBox(height: 12),
             _SheetField(ctrl: codeCtrl, label: 'Route Code'),
             const SizedBox(height: 12),
-            _SheetField(ctrl: descCtrl, label: 'Description', maxLines: 3),
-            const SizedBox(height: 12),
             _SheetField(
               ctrl: stopsCtrl,
               label: 'Stops',
@@ -176,7 +164,6 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                   await ApiService.updateRoute(auth.token!, route['_id'], {
                     'routeName': nameCtrl.text.trim(),
                     'routeCode': codeCtrl.text.trim(),
-                    'description': descCtrl.text.trim(),
                     'stops': _parseStops(stopsCtrl.text),
                   });
                   Navigator.pop(ctx);
@@ -272,14 +259,6 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                                 style: const TextStyle(color: Color(0xFF8892A4), fontSize: 12)),
                             Text('Stops: ${(route['stops'] as List?)?.length ?? 0}',
                                 style: const TextStyle(color: Color(0xFF8892A4), fontSize: 12)),
-                            if (route['description'] != null && route['description'].isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(route['description'],
-                                    style: const TextStyle(color: Color(0xFF8892A4), fontSize: 12),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                              ),
                           ],
                         ),
                         trailing: PopupMenuButton(
