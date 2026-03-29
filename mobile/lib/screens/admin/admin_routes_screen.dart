@@ -62,7 +62,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
             _SheetField(
               ctrl: stopsCtrl,
               label: 'Stops',
-              hint: 'Enter each stop on a new line: Name,latitude,longitude',
+              hint: 'Enter each stop name on a new line',
               maxLines: 5,
             ),
             const SizedBox(height: 20),
@@ -100,13 +100,16 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
         .split('\n')
         .map((line) => line.trim())
         .where((line) => line.isNotEmpty)
-        .map((line) {
-          final parts = line.split(',').map((p) => p.trim()).toList();
+        .toList()
+        .asMap()
+        .entries
+        .map((entry) {
+          final name = entry.value;
           return {
-            'name': parts.isNotEmpty ? parts[0] : 'Stop',
-            'latitude': parts.length > 1 ? double.tryParse(parts[1]) ?? 0.0 : 0.0,
-            'longitude': parts.length > 2 ? double.tryParse(parts[2]) ?? 0.0 : 0.0,
-            'order':  parts.length > 3 ? int.tryParse(parts[3]) ?? 0 : 0,
+            'name': name,
+            'latitude': 0.0,
+            'longitude': 0.0,
+            'order': entry.key + 1,
           };
         })
         .toList();
@@ -116,9 +119,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
     final stops = (route['stops'] as List?) ?? [];
     return stops.map((stop) {
       final s = stop as Map;
-      final lat = (s['latitude'] as num?)?.toString() ?? '0.0';
-      final lng = (s['longitude'] as num?)?.toString() ?? '0.0';
-      return '${s['name'] ?? 'Stop'},$lat,$lng';
+      return s['name']?.toString() ?? 'Stop';
     }).join('\n');
   }
 
@@ -151,7 +152,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
             _SheetField(
               ctrl: stopsCtrl,
               label: 'Stops',
-              hint: 'Name,latitude,longitude on each line',
+              hint: 'Enter each stop name on a new line',
               maxLines: 5,
             ),
             const SizedBox(height: 20),

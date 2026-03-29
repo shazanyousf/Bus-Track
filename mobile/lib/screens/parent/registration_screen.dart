@@ -351,6 +351,15 @@ class _SelectBusStep extends StatelessWidget {
                         Text(route['routeName'] ?? '',
                             style: const TextStyle(
                                 color: Color(0xFF8892A4), fontSize: 12)),
+                        if ((route['stops'] as List?)?.isNotEmpty == true) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Stops: ${(route['stops'] as List).map((s) => (s as Map)['name']).join(' → ')}',
+                            style: const TextStyle(color: Color(0xFF8892A4), fontSize: 11),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ],
                     ),
                   ),
