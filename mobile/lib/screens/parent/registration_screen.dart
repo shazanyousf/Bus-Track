@@ -20,8 +20,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   int _step = 0;
 
   List _buses   = [];
-  List _routes  = [];
   Map? _selectedBus;
+  Map? _selectedStop;
   String? _selectedDept;
   String? _selectedSemester;
   bool _loading = false;
@@ -36,6 +36,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _loadData();
     if (widget.preselectedBus != null) {
       _selectedBus = widget.preselectedBus;
+      _selectedStop = _initialStopForBus(widget.preselectedBus!);
     }
   }
 
@@ -44,13 +45,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final auth = context.read<AuthService>();
       final results = await Future.wait<dynamic>([
         ApiService.getBuses(),
-        ApiService.getRoutes(),
         ApiService.getSettings(auth.token!),
       ]);
       setState(() {
         _buses  = results[0] as List;
-        _routes = results[1] as List;
-        final settings = results[2] as Map;
+        final settings = results[1] as Map;
         _departments = List<String>.from(settings['departments'] ?? []);
         _semesters = List<String>.from(settings['semesters'] ?? []);
       });
@@ -70,6 +69,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Future<void> _submit() async {
     if (_selectedBus == null) return;
+    final route = _selectedBus!['routeId'] as Map? ?? {};
+    final stops = (route['stops'] as List?) ?? [];
+    if (stops.isNotEmpty && _selectedStop == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please select a pickup stop for this registration'),
+          backgroundColor: Colors.orange,
+        ));
+      }
+      return;
+    }
     if (_nameCtrl.text.trim().isEmpty || _idCtrl.text.trim().isEmpty ||
         _selectedDept == null || _selectedSemester == null) {
       if (mounted) {
@@ -89,6 +99,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         'routeId': _selectedBus!['routeId'] is Map
             ? _selectedBus!['routeId']['_id']
             : _selectedBus!['routeId'],
+        if (_selectedStop != null) 'stop': {
+          'name': _selectedStop!['name'],
+          'order': _selectedStop!['order'],
+          'latitude': _selectedStop!['latitude'],
+          'longitude': _selectedStop!['longitude'],
+        },
         'studentData': {
           'name':       _nameCtrl.text.trim(),
           'studentId':  _idCtrl.text.trim(),
@@ -106,6 +122,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         );
       }
     }
+  }
+
+  Map? _initialStopForBus(Map bus) {
+    final route = bus['routeId'] as Map? ?? {};
+    final stops = (route['stops'] as List?) ?? [];
+    return stops.isNotEmpty ? stops.first as Map : null;
+  }
+
+  void _selectBus(Map bus) {
+    setState(() {
+      _selectedBus = bus;
+      _selectedStop = _initialStopForBus(bus);
+      _step = 2;
+    });
   }
 
   @override
@@ -209,18 +239,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 _SelectBusStep(
                   buses:       _buses,
                   selectedBus: _selectedBus,
-                  onSelect:    (b) => setState(() { _selectedBus = b; _step = 2; }),
+                  onSelect:    _selectBus,
                   onBack:      () => setState(() => _step = 0),
                 ),
                 _ConfirmStep(
-                  nameCtrl:   _nameCtrl,
-                  idCtrl:     _idCtrl,
-                  dept:       _selectedDept,
-                  semester:   _selectedSemester,
+                  nameCtrl:    _nameCtrl,
+                  idCtrl:      _idCtrl,
+                  dept:        _selectedDept,
+                  semester:    _selectedSemester,
                   selectedBus: _selectedBus,
-                  loading:    _loading,
-                  onSubmit:   _submit,
-                  onBack:     () => setState(() => _step = 1),
+                  selectedStop: _selectedStop,
+                  onStopChanged: (stop) => setState(() => _selectedStop = stop),
+                  loading:     _loading,
+                  onSubmit:    _submit,
+                  onBack:      () => setState(() => _step = 1),
                 ),
               ][_step],
             ),
@@ -258,7 +290,7 @@ class _StudentInfoStep extends StatelessWidget {
         const SizedBox(height: 14),
         _Field(label: 'Student ID', ctrl: idCtrl, hint: 'e.g. CS-2021-001'),
         const SizedBox(height: 14),
-        _Field(label: 'Phone Number', ctrl: phoneCtrl, hint: '+92-300-0000000', type: TextInputType.phone),
+        _Field(label: 'Phone Number', ctrl: phoneCtrl, hint: '+91-98765-43210', type: TextInputType.phone),
         const SizedBox(height: 14),
         _DropdownField(
           label: 'Department',
@@ -405,13 +437,16 @@ class _ConfirmStep extends StatelessWidget {
   final TextEditingController nameCtrl, idCtrl;
   final String? dept, semester;
   final Map? selectedBus;
+  final Map? selectedStop;
+  final ValueChanged<Map?> onStopChanged;
   final bool loading;
   final VoidCallback onSubmit, onBack;
 
   const _ConfirmStep({
     required this.nameCtrl, required this.idCtrl,
     required this.dept, required this.semester,
-    required this.selectedBus, required this.loading,
+    required this.selectedBus, required this.selectedStop,
+    required this.onStopChanged, required this.loading,
     required this.onSubmit, required this.onBack,
   });
 
@@ -425,7 +460,9 @@ class _ConfirmStep extends StatelessWidget {
       ['Semester',     semester != null ? '$semester Semester' : 'N/A'],
       ['Bus',          selectedBus?['busNumber'] ?? 'N/A'],
       ['Route',        route['routeName'] ?? 'N/A'],
+      ['Stop',         selectedStop?['name'] ?? 'Not selected'],
     ];
+    final stops = (route['stops'] as List?) ?? [];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -456,6 +493,37 @@ class _ConfirmStep extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+        if (stops.isNotEmpty) ...[
+          const Text('Select Pickup Stop',
+              style: TextStyle(color: Color(0xFF8892A4), fontSize: 12, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF16213E),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF2A3A5C)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<Map?>(
+                value: selectedStop,
+                hint: const Text('Choose your stop', style: TextStyle(color: Color(0xFF4A5568))),
+                dropdownColor: const Color(0xFF16213E),
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+                isExpanded: true,
+                items: stops.map((stop) {
+                  final stopMap = stop as Map;
+                  return DropdownMenuItem<Map?>(
+                    value: stopMap,
+                    child: Text(stopMap['name'] ?? 'Unnamed stop'),
+                  );
+                }).toList(),
+                onChanged: onStopChanged,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(

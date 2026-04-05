@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const User = require('../models/User');
 
 const sign = (user) => jwt.sign(
@@ -8,13 +9,85 @@ const sign = (user) => jwt.sign(
   { expiresIn: '7d' }
 );
 
-// Register
+const _sendEmail = async ({ to, subject, text, html }) => {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return false;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+    to,
+    subject,
+    text,
+    html,
+  });
+  return true;
+};
+
+// Register with email verification
 router.post('/register', async (req, res) => {
   try {
-    const user = await User.create(req.body);
-    res.status(201).json({ token: sign(user), user: { id: user._id, name: user.name, role: user.role } });
+    const { name, email, password, phone } = req.body;
+    const existing = await User.findOne({ email });
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationExpiry = new Date(Date.now() + 10 * 60000); // 10 minutes
+
+    if (existing) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+
+    const user = await User.create({
+      name,
+      email,
+      password,
+      phone,
+      role: 'parent',
+      emailVerified: false,
+      emailVerificationCode: verificationCode,
+      emailVerificationExpiry: verificationExpiry,
+    });
+
+    await _sendEmail({
+      to: user.email,
+      subject: 'BusTrack Email Verification Code',
+      text: `Your BusTrack verification code is ${verificationCode}. It expires in 10 minutes.`,
+      html: `<p>Your BusTrack verification code is <strong>${verificationCode}</strong>.</p><p>This code expires in 10 minutes.</p>`,
+    }).catch(() => false);
+
+    res.status(202).json({ message: 'Verification code sent to email. Please enter it to complete registration.' });
   } catch (e) {
     res.status(400).json({ message: e.message });
+  }
+});
+
+// Verify registration code
+router.post('/verify-registration', async (req, res) => {
+  try {
+    const { email, verificationCode } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user.emailVerified) return res.status(400).json({ message: 'Email already verified' });
+    if (user.emailVerificationCode !== verificationCode || new Date() > user.emailVerificationExpiry)
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+
+    user.emailVerified = true;
+    user.emailVerificationCode = null;
+    user.emailVerificationExpiry = null;
+    await user.save();
+
+    res.json({ token: sign(user), user: { id: user._id, name: user.name, role: user.role } });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
   }
 });
 
@@ -23,7 +96,9 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (!user || !(await user.comparePassword(password)))
+    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+    if (user.emailVerified === false) return res.status(401).json({ message: 'Email not verified. Please check your inbox.' });
+    if (!(await user.comparePassword(password)))
       return res.status(401).json({ message: 'Invalid credentials' });
     res.json({ token: sign(user), user: { id: user._id, name: user.name, role: user.role } });
   } catch (e) {
@@ -37,15 +112,28 @@ router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'User not found' });
-    
-    // Generate 6-digit code
+
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     const resetCodeExpiry = new Date(Date.now() + 10 * 60000); // 10 minutes
-    
     await User.findByIdAndUpdate(user._id, { resetCode, resetCodeExpiry });
-    
-    // In production, send this via email. For demo, return it directly.
-    res.json({ message: 'Reset code sent to email', resetCode });
+
+    const emailSent = await _sendEmail({
+      to: user.email,
+      subject: 'BusTrack Password Reset Code',
+      text: `Your BusTrack password reset code is ${resetCode}. It expires in 10 minutes.`,
+      html: `<p>Your BusTrack password reset code is <strong>${resetCode}</strong>.</p><p>This code expires in 10 minutes.</p>`,
+    }).catch(() => false);
+
+    const message = emailSent
+      ? 'Reset code sent to your registered email address.'
+      : 'Reset code generated. Email sending is not configured on the server.';
+
+    const response = { message };
+    if (!emailSent && process.env.NODE_ENV !== 'production' && process.env.SHOW_RESET_CODE === 'true') {
+      response.resetCode = resetCode;
+    }
+
+    res.json(response);
   } catch (e) {
     res.status(500).json({ message: e.message });
   }

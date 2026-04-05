@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,8 +15,13 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _token != null;
   bool get isAdmin => _user?['role'] == 'admin';
-  String get baseUrl =>
-      dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:3000/api';
+  String get baseUrl {
+    final envUrl = dotenv.env['API_BASE_URL'];
+    if (envUrl != null && envUrl.isNotEmpty) return envUrl;
+    return Platform.isAndroid
+        ? 'http://10.0.2.2:3000/api'
+        : 'http://localhost:3000/api';
+  }
 
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -77,7 +83,7 @@ class AuthService extends ChangeNotifier {
           'email': email,
           'password': password,
           'phone': phone,
-          'role': 'parent'
+          'role': 'parent',
         }),
       ).timeout(
         const Duration(seconds: 20),
@@ -85,6 +91,39 @@ class AuthService extends ChangeNotifier {
       );
       final data = jsonDecode(res.body);
       if (res.statusCode == 201) {
+        _token = data['token'];
+        _user = data['user'];
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', _token!);
+        await prefs.setString('user', jsonEncode(_user));
+        notifyListeners();
+        return {'success': true};
+      }
+      if (res.statusCode == 202) {
+        return {'success': true, 'verificationRequired': true, 'message': data['message']};
+      }
+      return {'success': false, 'message': data['message']};
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error'};
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyRegistrationCode(
+      String email, String verificationCode) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/auth/verify-registration'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'verificationCode': verificationCode,
+        }),
+      ).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => throw Exception('Request timeout'),
+      );
+      final data = jsonDecode(res.body);
+      if (res.statusCode == 200) {
         _token = data['token'];
         _user = data['user'];
         final prefs = await SharedPreferences.getInstance();

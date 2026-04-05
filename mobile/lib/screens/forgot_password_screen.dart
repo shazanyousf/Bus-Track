@@ -39,7 +39,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Reset code: ${result['resetCode'] ?? 'Check email'}'),
+            content: Text(result['message'] ?? 'Reset code sent to your email'),
             backgroundColor: Colors.green,
           ),
         );
@@ -69,7 +69,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       });
     } catch (e) {
       setState(() {
-        _error = 'Invalid or expired reset code';
+        _error = e.toString().replaceFirst('Exception: ', '');
         _loading = false;
       });
     }
@@ -162,7 +162,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               if (_step == 0) ...[
                 _label('EMAIL ADDRESS'),
                 const SizedBox(height: 8),
-                _field(_emailCtrl, 'you@university.edu',
+                _field(_emailCtrl, 'example@gmail.com',
                     type: TextInputType.emailAddress),
                 const SizedBox(height: 20),
                 _buildButton('Send Reset Code', _sendResetCode),

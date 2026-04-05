@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../../services/socket_service.dart';
 import '../../services/auth_service.dart';
@@ -17,19 +18,23 @@ class DriverHome extends StatefulWidget {
 
 class _DriverHomeState extends State<DriverHome> {
   final SocketService _socket = SocketService();
-  final Completer<GoogleMapController> _mapController = Completer();
+  final MapController _mapController = MapController();
 
   List   _buses         = [];
   Map?   _selectedBus;
   bool   _isTracking    = false;
   bool   _loading       = true;
+  bool   _sendingAlert  = false;
   double _speed         = 0;
   int    _duration      = 0; // seconds since tracking started
   LatLng _currentPos    = const LatLng(24.8607, 67.0011);
   StreamSubscription<Position>? _posStream;
   Timer?  _durationTimer;
-  Set<Marker>   _markers   = {};
-  Set<Polyline> _polylines = {};
+  List<Marker>   _markers   = [];
+  List<Polyline> _polylines = [];
+
+  final TextEditingController _alertController = TextEditingController();
+  String _alertType = 'traffic';
 
   @override
   void initState() {
@@ -53,26 +58,24 @@ class _DriverHomeState extends State<DriverHome> {
       perm = await Geolocator.requestPermission();
     }
     if (perm == LocationPermission.deniedForever) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Location permission denied. Enable in Settings.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location permission denied. Enable in Settings.'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return false;
     }
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please enable Location Services on your device.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enable Location Services on your device.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
       return false;
     }
     return true;
@@ -119,25 +122,24 @@ class _DriverHomeState extends State<DriverHome> {
         speed:     pos.speed * 3.6, // m/s → km/h
       );
 
-      // Animate map camera
-      final ctrl = await _mapController.future;
-      ctrl.animateCamera(CameraUpdate.newLatLng(newPos));
+      _mapController.move(newPos, 15);
 
       setState(() {
         _currentPos = newPos;
         _speed = pos.speed * 3.6;
 
         // Update bus marker
-        _markers.removeWhere((m) => m.markerId.value == 'driver');
+        _markers.removeWhere((m) => m.key == const ValueKey('driver'));
         _markers.add(Marker(
-          markerId: const MarkerId('driver'),
-          position: newPos,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          infoWindow: InfoWindow(
-            title: _selectedBus!['busNumber'] ?? 'My Bus',
-            snippet: '${_speed.toStringAsFixed(0)} km/h',
+          key: const ValueKey('driver'),
+          point: newPos,
+          width: 40,
+          height: 40,
+          builder: (ctx) => const Icon(
+            Icons.directions_bus_rounded,
+            color: Colors.orange,
+            size: 32,
           ),
-          zIndex: 2,
         ));
       });
     });
@@ -167,42 +169,92 @@ class _DriverHomeState extends State<DriverHome> {
     if (_selectedBus == null) return;
     final route = _selectedBus!['routeId'] as Map? ?? {};
     final stops = (route['stops'] as List?) ?? [];
-    final Set<Marker> markers = {};
+    final List<Marker> markers = [];
     final List<LatLng> points = [];
 
     for (int i = 0; i < stops.length; i++) {
       final stop = stops[i] as Map;
-      final lat  = (stop['latitude']  as num?)?.toDouble() ?? 24.8607;
-      final lng  = (stop['longitude'] as num?)?.toDouble() ?? 67.0011;
-      final pos  = LatLng(lat, lng);
+      final lat = (stop['latitude'] as num?)?.toDouble() ?? 24.8607;
+      final lng = (stop['longitude'] as num?)?.toDouble() ?? 67.0011;
+      final pos = LatLng(lat, lng);
       points.add(pos);
       markers.add(Marker(
-        markerId: MarkerId('stop_$i'),
-        position: pos,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-        infoWindow: InfoWindow(title: stop['name'] ?? 'Stop ${i + 1}'),
+        key: ValueKey('stop_$i'),
+        point: pos,
+        width: 40,
+        height: 40,
+        builder: (ctx) => const Icon(
+          Icons.location_on,
+          color: Colors.blue,
+          size: 28,
+        ),
       ));
     }
 
     setState(() {
       _markers = markers;
       if (points.length >= 2) {
-        _polylines = {
+        _polylines = [
           Polyline(
-            polylineId: const PolylineId('route'),
-            points:  points,
-            color:   const Color(0xFF4A9EFF),
-            width:   4,
-            patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+            points: points,
+            color: const Color(0xFF4A9EFF),
+            strokeWidth: 4,
           ),
-        };
+        ];
+      } else {
+        _polylines = [];
       }
     });
+  }
+
+  Future<void> _sendAlert() async {
+    if (_selectedBus == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please select a bus first before sending alert'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+
+    if (_alertController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Enter an alert message'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+
+    final busId = _selectedBus!['_id'] as String? ??
+        _selectedBus!['busNumber'] as String? ??
+        'BUS001';
+
+    setState(() => _sendingAlert = true);
+
+    try {
+      _socket.emitAlert(
+        busId: busId,
+        type: _alertType,
+        message: _alertController.text.trim(),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Alert sent to parents'),
+        backgroundColor: Colors.green,
+      ));
+      _alertController.clear();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed to send alert: $e'),
+        backgroundColor: Colors.red,
+      ));
+    } finally {
+      setState(() => _sendingAlert = false);
+    }
   }
 
   @override
   void dispose() {
     _stopTracking();
+    _alertController.dispose();
     super.dispose();
   }
 
@@ -215,18 +267,24 @@ class _DriverHomeState extends State<DriverHome> {
       body: Stack(
         children: [
           // ── Google Map ─────────────────────────────────────
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _currentPos,
-              zoom:   15,
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              center: _currentPos,
+              zoom: 15,
+              minZoom: 3,
+              maxZoom: 18,
             ),
-            onMapCreated: (ctrl) => _mapController.complete(ctrl),
-            markers:   _markers,
-            polylines: _polylines,
-            myLocationEnabled:       true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled:     false,
-            mapType: MapType.normal,
+            children: [
+              TileLayer(
+                urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                subdomains: const ['a', 'b', 'c'],
+                userAgentPackageName: 'com.example.bustrack',
+              ),
+              if (_polylines.isNotEmpty)
+                PolylineLayer(polylines: _polylines),
+              MarkerLayer(markers: _markers),
+            ],
           ),
 
           // ── Top bar ────────────────────────────────────────
@@ -285,13 +343,15 @@ class _DriverHomeState extends State<DriverHome> {
                   const SizedBox(width: 10),
                   GestureDetector(
                     onTap: () async {
+                      final navigator = Navigator.of(context);
                       _stopTracking();
                       await auth.logout();
-                      if (mounted) {
-                        Navigator.pushReplacement(context,
-                            MaterialPageRoute(
-                                builder: (_) => const LoginScreen()));
-                      }
+                      if (!mounted) return;
+                      navigator.pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) => const LoginScreen(),
+                        ),
+                      );
                     },
                     child: Container(
                       width: 42, height: 42,
@@ -410,6 +470,87 @@ class _DriverHomeState extends State<DriverHome> {
                           icon: Icons.directions_bus_rounded,
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Driver issue alert panel
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111827),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF2A3A5C)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Send update to parents',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13)),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: _alertType,
+                                  dropdownColor: const Color(0xFF16213E),
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: const Color(0xFF0F172A),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(value: 'traffic', child: Text('Traffic jam')),
+                                    DropdownMenuItem(value: 'accident', child: Text('Accident')),
+                                    DropdownMenuItem(value: 'delay', child: Text('Delay')),
+                                    DropdownMenuItem(value: 'other', child: Text('Other')),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value != null) setState(() => _alertType = value);
+                                  },
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              _sendingAlert
+                                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : GestureDetector(
+                                      onTap: _sendAlert,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF2ECC71),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Text('Send', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _alertController,
+                            maxLines: 2,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: InputDecoration(
+                              hintText: 'Enter issue e.g. traffic jam near exit',
+                              hintStyle: const TextStyle(color: Color(0xFF8892A4)),
+                              filled: true,
+                              fillColor: const Color(0xFF0F172A),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                   ],

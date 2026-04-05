@@ -8,6 +8,9 @@ const userSchema = new mongoose.Schema({
   role:     { type: String, enum: ['parent', 'admin', 'driver'], default: 'parent', index: true },
   phone:    { type: String, default: '' },
   busId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Bus', default: null },
+  emailVerified: { type: Boolean, default: false },
+  emailVerificationCode: { type: String, default: null },
+  emailVerificationExpiry: { type: Date, default: null },
   resetCode: { type: String, default: null },
   resetCodeExpiry: { type: Date, default: null }
 }, { timestamps: true });

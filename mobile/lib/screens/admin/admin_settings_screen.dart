@@ -12,11 +12,9 @@ class AdminSettingsScreen extends StatefulWidget {
 
 class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   List<String> _departments = [];
-  List<String> _semesters = [];
   bool _loading = true;
   bool _saving = false;
   final _deptCtrl = TextEditingController();
-  final _semCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -31,7 +29,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       final data = await ApiService.getSettings(auth.token!);
       setState(() {
         _departments = List<String>.from(data['departments'] ?? []);
-        _semesters = List<String>.from(data['semesters'] ?? []);
         _loading = false;
       });
     } catch (_) {
@@ -45,7 +42,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     try {
       await ApiService.updateSettings(auth.token!, {
         'departments': _departments,
-        'semesters': _semesters,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -74,21 +70,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     });
   }
 
-  void _addSemester() {
-    final value = _semCtrl.text.trim();
-    if (value.isEmpty) return;
-    setState(() {
-      _semesters.add(value);
-      _semCtrl.clear();
-    });
-  }
-
   void _removeDepartment(int index) {
     setState(() => _departments.removeAt(index));
-  }
-
-  void _removeSemester(int index) {
-    setState(() => _semesters.removeAt(index));
   }
 
   @override
@@ -99,7 +82,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         backgroundColor: const Color(0xFF16213E),
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Manage Settings', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Manage Departments', style: TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)))
@@ -118,16 +101,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                     return _buildChip(value, () => _removeDepartment(i));
                   }).toList(),
                   const SizedBox(height: 28),
-                  const Text('Semesters', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 12),
-                  _buildInputRow(_semCtrl, 'Add semester', _addSemester),
-                  const SizedBox(height: 12),
-                  ..._semesters.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final value = entry.value;
-                    return _buildChip(value, () => _removeSemester(i));
-                  }).toList(),
-                  const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -140,7 +113,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                       ),
                       child: _saving
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Save Settings', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                          : const Text('Save Departments', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                     ),
                   ),
                   const SizedBox(height: 20),

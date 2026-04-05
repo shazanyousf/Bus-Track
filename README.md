@@ -25,6 +25,8 @@
 ### Terminal 1 — Backend
 ```bash
 cd bustrack/backend
+cp .env.example .env
+# update .env with your MongoDB and email provider settings
 npm install
 npm run dev
 ```

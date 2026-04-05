@@ -1,6 +1,6 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../services/socket_service.dart';
 
 class LiveTrackingScreen extends StatefulWidget {
@@ -13,22 +13,27 @@ class LiveTrackingScreen extends StatefulWidget {
 }
 
 class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
-  final Completer<GoogleMapController> _mapController = Completer();
+  final MapController _mapController = MapController();
   final SocketService _socket = SocketService();
 
   LatLng _busPosition = const LatLng(24.8607, 67.0011); // default Karachi
   double _speed       = 0;
   String _lastUpdate  = 'Waiting for signal...';
   bool   _connected   = false;
+  Map<String, dynamic>? _lastAlert;
 
-  Set<Marker>   _markers   = {};
-  Set<Polyline> _polylines = {};
+  List<Marker>   _markers   = [];
+  List<Polyline> _polylines = [];
 
   // Build route stop markers from bus data
+  Map _safeMap(dynamic value) => value is Map ? value : {};
+  List _safeList(dynamic value) => value is List ? value : [];
+
   List<LatLng> get _stopPositions {
-    final route = widget.bus['routeId'] as Map? ?? {};
-    final stops = (route['stops'] as List?) ?? [];
+    final route = _safeMap(widget.bus['routeId']);
+    final stops = _safeList(route['stops']);
     return stops.map<LatLng>((s) {
+      if (s is! Map) return const LatLng(24.8607, 67.0011);
       return LatLng(
         (s['latitude']  as num?)?.toDouble() ?? 24.8607,
         (s['longitude'] as num?)?.toDouble() ?? 67.0011,
@@ -45,36 +50,43 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   }
 
   void _buildInitialMarkers() {
-    final route = widget.bus['routeId'] as Map? ?? {};
-    final stops = (route['stops'] as List?) ?? [];
-    final Set<Marker> markers = {};
+    final route = _safeMap(widget.bus['routeId']);
+    final stops = _safeList(route['stops']);
+    final List<Marker> markers = [];
 
     for (int i = 0; i < stops.length; i++) {
-      final stop = stops[i] as Map;
+      final stop = stops[i] is Map ? stops[i] as Map : {};
       final lat  = (stop['latitude']  as num?)?.toDouble() ?? 24.8607;
       final lng  = (stop['longitude'] as num?)?.toDouble() ?? 67.0011;
       markers.add(
         Marker(
-          markerId: MarkerId('stop_$i'),
-          position: LatLng(lat, lng),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-          infoWindow: InfoWindow(
-            title: stop['name'] ?? 'Stop ${i + 1}',
-            snippet: i == 0 ? 'Start' : i == stops.length - 1 ? 'End' : 'Stop',
+          key: ValueKey('stop_$i'),
+          point: LatLng(lat, lng),
+          width: 40,
+          height: 40,
+          builder: (ctx) => Icon(
+            Icons.location_on,
+            color: i == 0
+                ? Colors.green
+                : i == stops.length - 1
+                    ? Colors.red
+                    : Colors.blue,
+            size: 28,
           ),
         ),
       );
     }
 
     // Route polyline
-    if (_stopPositions.length >= 2) {
-      _polylines.add(Polyline(
-        polylineId: const PolylineId('route'),
-        points:  _stopPositions,
-        color:   const Color(0xFF4A9EFF),
-        width:   4,
-        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
-      ));
+    final stopPositions = _stopPositions;
+    if (stopPositions.length >= 2) {
+      _polylines = [
+        Polyline(
+          points: stopPositions,
+          color: const Color(0xFF4A9EFF),
+          strokeWidth: 4,
+        ),
+      ];
     }
 
     setState(() => _markers = markers);
@@ -85,6 +97,16 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         widget.bus['busNumber'] as String? ??
         'BUS001';
 
+    _socket.listenToBusAlerts(busId, (alert) {
+      if (!mounted) return;
+      setState(() => _lastAlert = alert);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${alert['type'].toString().toUpperCase()}: ${alert['message']}'),
+        backgroundColor: const Color(0xFFE74C3C),
+        duration: const Duration(seconds: 5),
+      ));
+    });
+
     _socket.listenToBus(busId, (data) async {
       final lat = (data['lat'] as num?)?.toDouble();
       final lng = (data['lng'] as num?)?.toDouble();
@@ -94,9 +116,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
 
       final newPos = LatLng(lat, lng);
 
-      // Animate camera to follow bus
-      final ctrl = await _mapController.future;
-      ctrl.animateCamera(CameraUpdate.newLatLng(newPos));
+      _mapController.move(newPos, 15);
 
       setState(() {
         _busPosition = newPos;
@@ -105,17 +125,18 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         _lastUpdate  = _formatTime(data['timestamp'] as String?);
 
         // Update bus marker
-        _markers.removeWhere((m) => m.markerId.value == 'bus');
+        _markers.removeWhere((m) => m.key == const ValueKey('bus'));
         _markers.add(
           Marker(
-            markerId: const MarkerId('bus'),
-            position: newPos,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-            infoWindow: InfoWindow(
-              title: widget.bus['busNumber'] ?? 'Bus',
-              snippet: '${speed.toStringAsFixed(0)} km/h',
+            key: const ValueKey('bus'),
+            point: newPos,
+            width: 40,
+            height: 40,
+            builder: (ctx) => const Icon(
+              Icons.directions_bus_rounded,
+              color: Colors.orange,
+              size: 32,
             ),
-            zIndex: 2,
           ),
         );
       });
@@ -141,31 +162,38 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   void dispose() {
     final busId = widget.bus['_id'] as String? ?? 'BUS001';
     _socket.stopListening(busId);
+    _socket.stopListeningAlerts(busId);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final driver = widget.bus['driverId'] as Map? ?? {};
-    final route  = widget.bus['routeId']  as Map? ?? {};
+    final driver = _safeMap(widget.bus['driverId']);
+    final route  = _safeMap(widget.bus['routeId']);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F1A),
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // ── Google Map ──────────────────────────────────────
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _busPosition,
-              zoom:   15,
+          // ── Map ─────────────────────────────────────────────
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              center: _busPosition,
+              zoom: 15,
+              minZoom: 3,
+              maxZoom: 18,
             ),
-            onMapCreated: (ctrl) => _mapController.complete(ctrl),
-            markers:   _markers,
-            polylines: _polylines,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled:     false,
-            mapToolbarEnabled:       false,
-            mapType: MapType.normal,
+            children: [
+              TileLayer(
+                urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                subdomains: const ['a', 'b', 'c'],
+                userAgentPackageName: 'com.example.bustrack',
+              ),
+              if (_polylines.isNotEmpty)
+                PolylineLayer(polylines: _polylines),
+              MarkerLayer(markers: _markers),
+            ],
           ),
 
           // ── Top bar ─────────────────────────────────────────
@@ -193,7 +221,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F0F1A).withOpacity(0.9),
+                        color: const Color(0xFF0F0F1A).withOpacity(0.55),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: const Color(0xFF2A3A5C)),
                       ),
@@ -270,126 +298,155 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
           ),
 
           // ── Bottom info panel ───────────────────────────────
-          Positioned(
-            bottom: 0, left: 0, right: 0,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F0F1A).withOpacity(0.96),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
-                border: const Border(
-                    top: BorderSide(color: Color(0xFF2A3A5C))),
-              ),
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Drag handle
-                  Container(
-                    width: 40, height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2A3A5C),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Stats row
-                  Row(
-                    children: [
-                      _InfoChip(
-                        icon: Icons.speed_rounded,
-                        label: 'Speed',
-                        value: '${_speed.toStringAsFixed(0)} km/h',
-                        color: const Color(0xFFFF6B35),
-                      ),
-                      const SizedBox(width: 10),
-                      _InfoChip(
-                        icon: Icons.access_time_rounded,
-                        label: 'Updated',
-                        value: _lastUpdate,
-                        color: const Color(0xFF4A9EFF),
-                      ),
-                      const SizedBox(width: 10),
-                      _InfoChip(
-                        icon: Icons.airline_seat_recline_normal_rounded,
-                        label: 'Seats',
-                        value: '${widget.bus['availableSeats'] ?? 0} left',
-                        color: const Color(0xFF2ECC71),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Driver row
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16213E),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF2A3A5C)),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor:
-                              const Color(0xFF4A9EFF).withOpacity(0.15),
-                          child: Text(
-                            (driver['name'] as String? ?? 'D').isNotEmpty
-                                ? (driver['name'] as String)[0].toUpperCase()
-                                : 'D',
-                            style: const TextStyle(
-                                color: Color(0xFF4A9EFF),
-                                fontWeight: FontWeight.w800,
-                                fontSize: 18),
-                          ),
+          DraggableScrollableSheet(
+            initialChildSize: 0.30,
+            minChildSize: 0.18,
+            maxChildSize: 0.4,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F0F1A).withOpacity(0.5),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(24)),
+                  border: const Border(
+                      top: BorderSide(color: Color(0xFF2A3A5C))),
+                ),
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2A3A5C),
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(driver['name'] ?? 'Driver',
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14)),
-                              Text(driver['phone'] ?? '',
-                                  style: const TextStyle(
-                                      color: Color(0xFF8892A4),
-                                      fontSize: 12)),
-                            ],
-                          ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    if (_lastAlert != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE74C3C).withOpacity(0.20),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE74C3C).withOpacity(0.35)),
                         ),
-                        // Call button
-                        GestureDetector(
-                          onTap: () {},
-                          child: Container(
-                            width: 42, height: 42,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF2ECC71).withOpacity(0.15),
-                              border: Border.all(
-                                  color: const Color(0xFF2ECC71)
-                                      .withOpacity(0.4)),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_rounded, color: Color(0xFFE74C3C)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${_lastAlert?['type'].toString().toUpperCase()}: ${_lastAlert?['message']}',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                              ),
                             ),
-                            child: const Icon(Icons.phone_rounded,
-                                color: Color(0xFF2ECC71), size: 18),
-                          ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    Row(
+                      children: [
+                        _InfoChip(
+                          icon: Icons.speed_rounded,
+                          label: 'Speed',
+                          value: '${_speed.toStringAsFixed(0)} km/h',
+                          color: const Color(0xFFFF6B35),
+                        ),
+                        const SizedBox(width: 10),
+                        _InfoChip(
+                          icon: Icons.access_time_rounded,
+                          label: 'Updated',
+                          value: _lastUpdate,
+                          color: const Color(0xFF4A9EFF),
+                        ),
+                        const SizedBox(width: 10),
+                        _InfoChip(
+                          icon: Icons.airline_seat_recline_normal_rounded,
+                          label: 'Seats',
+                          value: '${widget.bus['availableSeats'] ?? 0} left',
+                          color: const Color(0xFF2ECC71),
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 16),
 
-                  // Stops list
-                  const SizedBox(height: 16),
-                  _StopsList(
-                      stops: (route['stops'] as List?) ?? [],
-                      busPosition: _busPosition),
-                ],
-              ),
-            ),
+                    // Driver row
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF16213E),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF2A3A5C)),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 22,
+                            backgroundColor:
+                                const Color(0xFF4A9EFF).withOpacity(0.15),
+                            child: Text(
+                              (driver['name'] is String && (driver['name'] as String).isNotEmpty)
+                                  ? (driver['name'] as String)[0].toUpperCase()
+                                  : 'D',
+                              style: const TextStyle(
+                                  color: Color(0xFF4A9EFF),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(driver['name'] ?? 'Driver',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14)),
+                                Text(driver['phone'] ?? '',
+                                    style: const TextStyle(
+                                        color: Color(0xFF8892A4),
+                                        fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                          // Call button
+                          GestureDetector(
+                            onTap: () {},
+                            child: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF2ECC71).withOpacity(0.15),
+                                border: Border.all(
+                                    color: const Color(0xFF2ECC71)
+                                        .withOpacity(0.4)),
+                              ),
+                              child: const Icon(Icons.phone_rounded,
+                                  color: Color(0xFF2ECC71), size: 18),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+                    _StopsList(
+                        stops: _safeList(route['stops']),
+                        busPosition: _busPosition),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),

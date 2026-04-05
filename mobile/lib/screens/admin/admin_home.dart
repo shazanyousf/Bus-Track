@@ -21,12 +21,13 @@ class _AdminHomeState extends State<AdminHome> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = const [
-      _AdminDashboard(),
-      AdminRoutesScreen(),
-      AdminBusesScreen(),
-      AdminRequestsScreen(),
-      AdminDriversScreen(),
+    final pages = [
+      _AdminDashboard(onManageDepartments: () => setState(() => _currentIndex = 5)),
+      const AdminRoutesScreen(),
+      const AdminBusesScreen(),
+      const AdminRequestsScreen(),
+      const AdminDriversScreen(),
+      const AdminSettingsScreen(),
     ];
 
     return Scaffold(
@@ -51,6 +52,7 @@ class _AdminHomeState extends State<AdminHome> {
             BottomNavigationBarItem(icon: Icon(Icons.directions_bus_rounded), label: 'Buses'),
             BottomNavigationBarItem(icon: Icon(Icons.assignment_rounded), label: 'Requests'),
             BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Drivers'),
+            BottomNavigationBarItem(icon: Icon(Icons.account_tree_rounded), label: 'Departments'),
           ],
         ),
       ),
@@ -59,7 +61,9 @@ class _AdminHomeState extends State<AdminHome> {
 }
 
 class _AdminDashboard extends StatefulWidget {
-  const _AdminDashboard();
+  const _AdminDashboard({required this.onManageDepartments});
+
+  final VoidCallback onManageDepartments;
 
   @override
   State<_AdminDashboard> createState() => _AdminDashboardState();
@@ -192,33 +196,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 ),
                 const SizedBox(height: 24),
 
-                GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),
-                  ),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16213E),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFF2A3A5C)),
-                    ),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.settings_rounded, color: Color(0xFFFF6B35), size: 24),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text('Manage Departments & Semesters',
-                              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-                        ),
-                        Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF8892A4), size: 16),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
 
                 const Text('Recent Requests',
                     style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),

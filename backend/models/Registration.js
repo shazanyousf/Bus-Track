@@ -5,6 +5,12 @@ const registrationSchema = new mongoose.Schema({
   parentId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   busId:        { type: mongoose.Schema.Types.ObjectId, ref: 'Bus', required: true },
   routeId:      { type: mongoose.Schema.Types.ObjectId, ref: 'Route', required: true },
+  stop: {
+    name: { type: String, default: '' },
+    order: { type: Number, default: 0 },
+    latitude: { type: Number, default: 0 },
+    longitude: { type: Number, default: 0 },
+  },
   status:       { type: String, enum: ['pending','approved','rejected','cancelled'], default: 'pending' },
   requestDate:  { type: Date, default: Date.now },
   reviewedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

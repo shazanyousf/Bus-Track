@@ -1,12 +1,18 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiService {
   static const Duration _timeout = Duration(seconds: 20);
   
-  static String get baseUrl =>
-      dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:3000/api';
+  static String get baseUrl {
+    final envUrl = dotenv.env['API_BASE_URL'];
+    if (envUrl != null && envUrl.isNotEmpty) return envUrl;
+    return Platform.isAndroid
+        ? 'http://10.0.2.2:3000/api'
+        : 'http://localhost:3000/api';
+  }
 
   static Map<String, String> headers(String token) => {
         'Content-Type': 'application/json',
@@ -101,12 +107,16 @@ class ApiService {
   static Future<Map> updateSettings(String token, Map data) async {
     final res = await http.put(Uri.parse('$baseUrl/settings'),
         headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
-    final body = jsonDecode(res.body);
     if (res.statusCode != 200) {
-      final message = body['message'] ?? 'Failed to update settings';
-      throw Exception(message);
+      try {
+        final body = jsonDecode(res.body);
+        final message = body['message'] ?? 'Failed to update settings';
+        throw Exception(message);
+      } catch (e) {
+        throw Exception('Failed to update settings (${res.statusCode}): ${res.body}');
+      }
     }
-    return body;
+    return jsonDecode(res.body);
   }
 
   // ── Registrations ────────────────────────────────────────
@@ -166,7 +176,12 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email}),
     ).timeout(_timeout);
-    return jsonDecode(res.body);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      final message = body['message'] ?? 'Failed to request reset code';
+      throw Exception(message);
+    }
+    return body;
   }
 
   static Future<Map> verifyResetCode(String email, String resetCode) async {
@@ -175,7 +190,12 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'resetCode': resetCode}),
     ).timeout(_timeout);
-    return jsonDecode(res.body);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      final message = body['message'] ?? 'Invalid or expired reset code';
+      throw Exception(message);
+    }
+    return body;
   }
 
   static Future<Map> resetPassword(String email, String resetCode, String newPassword) async {
@@ -184,6 +204,11 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'resetCode': resetCode, 'newPassword': newPassword}),
     ).timeout(_timeout);
-    return jsonDecode(res.body);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      final message = body['message'] ?? 'Failed to reset password';
+      throw Exception(message);
+    }
+    return body;
   }
 }

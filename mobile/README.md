@@ -15,3 +15,12 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+## Map setup
+
+The bus tracking screens now use `flutter_map` with OpenStreetMap tiles, so you do not need a Google Maps API key.
+
+- No Android API key is required.
+- No iOS API key is required.
+
+If maps still do not appear, make sure the device has internet access and that tile downloads are allowed.

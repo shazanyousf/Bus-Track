@@ -17,12 +17,14 @@ class _SignupScreenState extends State<SignupScreen> {
   final _phoneCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  final _codeCtrl = TextEditingController();
   bool _obscure = true;
   bool _obscureConfirm = true;
   String _error = '';
+  int _step = 0; // 0 = account details, 1 = email verification
 
   Future<void> _signup() async {
-    setState(() => _error = '');
+    setState(() { _error = ''; });
 
     // Validation
     if (_nameCtrl.text.trim().isEmpty) {
@@ -60,11 +62,42 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (!mounted) return;
 
+    if (result['success'] && result['verificationRequired'] == true) {
+      setState(() {
+        _step = 1;
+        _error = result['message'] ?? 'Verification code sent to email';
+      });
+      return;
+    }
+
     if (result['success']) {
       Navigator.pushReplacement(
           context, MaterialPageRoute(builder: (_) => const ParentHome()));
     } else {
       setState(() => _error = result['message'] ?? 'Signup failed');
+    }
+  }
+
+  Future<void> _verifyCode() async {
+    setState(() { _error = ''; });
+    if (_codeCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'Please enter the verification code');
+      return;
+    }
+
+    final auth = context.read<AuthService>();
+    final result = await auth.verifyRegistrationCode(
+      _emailCtrl.text.trim(),
+      _codeCtrl.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    if (result['success']) {
+      Navigator.pushReplacement(
+          context, MaterialPageRoute(builder: (_) => const ParentHome()));
+    } else {
+      setState(() => _error = result['message'] ?? 'Verification failed');
     }
   }
 
@@ -112,49 +145,131 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-              _label('FULL NAME'),
-              const SizedBox(height: 8),
-              _field(_nameCtrl, 'e.g. John Smith'),
-              const SizedBox(height: 14),
-              _label('EMAIL'),
-              const SizedBox(height: 8),
-              _field(_emailCtrl, 'you@university.edu',
-                  type: TextInputType.emailAddress),
-              const SizedBox(height: 14),
-              _label('PHONE (OPTIONAL)'),
-              const SizedBox(height: 8),
-              _field(_phoneCtrl, '+1 (555) 000-0000',
-                  type: TextInputType.phone),
-              const SizedBox(height: 14),
-              _label('PASSWORD'),
-              const SizedBox(height: 8),
-              _field(_passCtrl, '••••••••',
-                  obscure: _obscure,
-                  suffix: IconButton(
-                    icon: Icon(
-                        _obscure
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        color: const Color(0xFF8892A4),
-                        size: 20),
-                    onPressed: () =>
-                        setState(() => _obscure = !_obscure),
-                  )),
-              const SizedBox(height: 14),
-              _label('CONFIRM PASSWORD'),
-              const SizedBox(height: 8),
-              _field(_confirmCtrl, '••••••••',
-                  obscure: _obscureConfirm,
-                  suffix: IconButton(
-                    icon: Icon(
-                        _obscureConfirm
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        color: const Color(0xFF8892A4),
-                        size: 20),
-                    onPressed: () =>
-                        setState(() => _obscureConfirm = !_obscureConfirm),
-                  )),
+              if (_step == 0) ...[
+                _label('FULL NAME'),
+                const SizedBox(height: 8),
+                _field(_nameCtrl, 'e.g. John Smith'),
+                const SizedBox(height: 14),
+                _label('EMAIL'),
+                const SizedBox(height: 8),
+                _field(_emailCtrl, 'example@gmail.com',
+                    type: TextInputType.emailAddress),
+                const SizedBox(height: 14),
+                _label('PHONE (OPTIONAL)'),
+                const SizedBox(height: 8),
+                _field(_phoneCtrl, '+91 98765 43210',
+                    type: TextInputType.phone),
+                const SizedBox(height: 14),
+                _label('PASSWORD'),
+                const SizedBox(height: 8),
+                _field(_passCtrl, '••••••••',
+                    obscure: _obscure,
+                    suffix: IconButton(
+                      icon: Icon(
+                          _obscure
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: const Color(0xFF8892A4),
+                          size: 20),
+                      onPressed: () =>
+                          setState(() => _obscure = !_obscure),
+                    )),
+                const SizedBox(height: 14),
+                _label('CONFIRM PASSWORD'),
+                const SizedBox(height: 8),
+                _field(_confirmCtrl, '••••••••',
+                    obscure: _obscureConfirm,
+                    suffix: IconButton(
+                      icon: Icon(
+                          _obscureConfirm
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: const Color(0xFF8892A4),
+                          size: 20),
+                      onPressed: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
+                    )),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: auth.isLoading ? null : _signup,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF6B35),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      elevation: 0,
+                    ),
+                    child: auth.isLoading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2))
+                        : const Text('Create Account →',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ] else ...[
+                _label('EMAIL VERIFICATION'),
+                const SizedBox(height: 8),
+                Text(
+                  'Enter the code sent to ${_emailCtrl.text}',
+                  style: const TextStyle(color: Color(0xFF8892A4), fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                _field(_codeCtrl, 'e.g. 123456', type: TextInputType.number),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: auth.isLoading ? null : _verifyCode,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF6B35),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      elevation: 0,
+                    ),
+                    child: auth.isLoading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2))
+                        : const Text('Verify Email →',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton(
+                    onPressed: () => setState(() {
+                      _step = 0;
+                      _codeCtrl.clear();
+                      _error = '';
+                    }),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF2A3A5C)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Edit Details',
+                        style: TextStyle(
+                            color: Color(0xFFFF6B35),
+                            fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ],
               if (_error.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 Container(
@@ -174,31 +289,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ]),
                 ),
               ],
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: auth.isLoading ? null : _signup,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B35),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                    elevation: 0,
-                  ),
-                  child: auth.isLoading
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2))
-                      : const Text('Create Account →',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800)),
-                ),
-              ),
               const SizedBox(height: 16),
               Center(
                 child: Row(

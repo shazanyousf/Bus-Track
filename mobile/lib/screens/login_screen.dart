@@ -92,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 30),
               _label('EMAIL'),
               const SizedBox(height: 8),
-              _field(_emailCtrl, 'you@university.edu', type: TextInputType.emailAddress),
+              _field(_emailCtrl, 'example@gmail.com', type: TextInputType.emailAddress),
               const SizedBox(height: 18),
               _label('PASSWORD'),
               const SizedBox(height: 8),

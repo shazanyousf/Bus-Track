@@ -9,7 +9,13 @@ router.get('/', auth, async (req, res) => {
   try {
     const filter = req.user.role === 'parent' ? { parentId: req.user.id } : {};
     const regs = await Registration.find(filter)
-      .populate('studentId').populate('busId').populate('routeId').populate('parentId', 'name email');
+      .populate('studentId')
+      .populate({
+        path: 'busId',
+        populate: [{ path: 'driverId' }, { path: 'routeId' }],
+      })
+      .populate('routeId')
+      .populate('parentId', 'name email');
     res.json(regs);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -46,16 +52,32 @@ router.post('/', auth, async (req, res) => {
       student = await Student.create(studentData);
     }
 
-    // Create registration with the student ID
-    const reg = await Registration.create({
+    // Create registration with the student ID and optional selected stop
+    const regData = {
       studentId: student._id,
       busId: req.body.busId,
       routeId: req.body.routeId,
-      parentId: req.user.id
-    });
+      parentId: req.user.id,
+    };
+    if (req.body.stop) {
+      regData.stop = {
+        name: req.body.stop.name,
+        order: req.body.stop.order,
+        latitude: req.body.stop.latitude,
+        longitude: req.body.stop.longitude,
+      };
+    }
+
+    const reg = await Registration.create(regData);
     
     // Populate the response
-    const populated = await reg.populate('studentId').populate('busId').populate('routeId');
+    const populated = await Registration.findById(reg._id)
+  .populate('studentId')
+  .populate({
+    path: 'busId',
+    populate: [{ path: 'driverId' }, { path: 'routeId' }],
+  })
+  .populate('routeId');
     res.status(201).json(populated);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
@@ -91,7 +113,10 @@ router.put('/:id/status', auth, auth.adminOnly, async (req, res) => {
 
     const populated = await Registration.findById(reg._id)
       .populate('studentId')
-      .populate('busId')
+      .populate({
+        path: 'busId',
+        populate: [{ path: 'driverId' }, { path: 'routeId' }],
+      })
       .populate('routeId')
       .populate('parentId', 'name email');
 

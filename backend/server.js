@@ -78,6 +78,23 @@ io.on('connection', (socket) => {
   }
 });
 
+  // Driver issue / traffic update -> broadcast to all parents for this bus
+  socket.on('driver:alert', (data) => {
+    if (!data.busId || !data.message) return;
+
+    const alertPayload = {
+      busId: data.busId,
+      type: data.type || 'info',
+      message: data.message,
+      timestamp: new Date().toISOString(),
+    };
+
+    io.emit(`bus:alert:${data.busId}`, alertPayload);
+    io.emit('bus:alert', alertPayload); // optional global channel
+
+    console.log(`🚨 Bus ${data.busId} alert (${alertPayload.type}): ${alertPayload.message}`);
+  });
+
   socket.on('disconnect', () => {
     console.log(`📴 Client disconnected: ${socket.id}`);
   });
@@ -102,7 +119,7 @@ io.on('connection', (socket) => {
 
 // ── MongoDB + Start ──────────────────────────────────────────────────────────
 const PORT      = process.env.PORT     || 3000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/bustrack_university';
+const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/bustrack_university';
 
 mongoose.connect(MONGO_URI)
   .then(() => {

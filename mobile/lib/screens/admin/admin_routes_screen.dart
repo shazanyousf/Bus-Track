@@ -36,7 +36,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
   Future<void> _showAddRouteDialog() async {
     final nameCtrl = TextEditingController();
     final codeCtrl = TextEditingController();
-    final stopsCtrl = TextEditingController();
+    final stops = <_RouteStop>[];
 
     await showModalBottomSheet(
       context: context,
@@ -44,13 +44,15 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             const Text('Add New Route',
                 style: TextStyle(
                     color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
@@ -58,12 +60,53 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
             _SheetField(ctrl: nameCtrl, label: 'Route Name', hint: 'e.g. Downtown Express'),
             const SizedBox(height: 12),
             _SheetField(ctrl: codeCtrl, label: 'Route Code', hint: 'e.g. RT-001'),
+            const SizedBox(height: 16),
+            const Text('Route Stops', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
-            _SheetField(
-              ctrl: stopsCtrl,
-              label: 'Stops',
-              hint: 'Enter each stop name on a new line',
-              maxLines: 5,
+            Column(
+              children: stops.asMap().entries.map((entry) {
+                final index = entry.key;
+                final stop = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Stop ${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                          IconButton(
+                            onPressed: () => setLocal(() => stops.removeAt(index)),
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                          ),
+                        ],
+                      ),
+                      _SheetField(ctrl: stop.nameCtrl, label: 'Name', hint: 'e.g. Main Gate'),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: _SheetField(ctrl: stop.latCtrl, label: 'Latitude', hint: 'e.g. 24.8607', type: TextInputType.number)),
+                          const SizedBox(width: 10),
+                          Expanded(child: _SheetField(ctrl: stop.lngCtrl, label: 'Longitude', hint: 'e.g. 67.0011', type: TextInputType.number)),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton(
+                onPressed: () => setLocal(() => stops.add(_RouteStop())),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF4A9EFF)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Add Stop', style: TextStyle(color: Color(0xFF4A9EFF), fontWeight: FontWeight.w700)),
+              ),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -75,7 +118,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                   await ApiService.addRoute(auth.token!, {
                     'routeName': nameCtrl.text.trim(),
                     'routeCode': codeCtrl.text.trim(),
-                    'stops': _parseStops(stopsCtrl.text),
+                    'stops': stops.asMap().entries.map((entry) => entry.value.toJson(entry.key)).toList(),
                   });
                   Navigator.pop(ctx);
                   _load();
@@ -92,41 +135,21 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  List<Map<String, dynamic>> _parseStops(String rawText) {
-    return rawText
-        .split('\n')
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList()
-        .asMap()
-        .entries
-        .map((entry) {
-          final name = entry.value;
-          return {
-            'name': name,
-            'latitude': 0.0,
-            'longitude': 0.0,
-            'order': entry.key + 1,
-          };
-        })
-        .toList();
-  }
-
-  String _stopsTextForRoute(Map route) {
-    final stops = (route['stops'] as List?) ?? [];
-    return stops.map((stop) {
-      final s = stop as Map;
-      return s['name']?.toString() ?? 'Stop';
-    }).join('\n');
+    ),
+  ),
+  );
   }
 
   Future<void> _showEditRouteDialog(Map route) async {
     final nameCtrl = TextEditingController(text: route['routeName'] ?? '');
     final codeCtrl = TextEditingController(text: route['routeCode'] ?? '');
-    final stopsCtrl = TextEditingController(text: _stopsTextForRoute(route));
+    final stops = ((route['stops'] as List?) ?? [])
+        .map((stop) => _RouteStop(
+              name: stop['name']?.toString() ?? '',
+              latitude: stop['latitude']?.toString() ?? '',
+              longitude: stop['longitude']?.toString() ?? '',
+            ))
+        .toList();
 
     await showModalBottomSheet(
       context: context,
@@ -134,13 +157,15 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             const Text('Edit Route',
                 style: TextStyle(
                     color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
@@ -148,12 +173,53 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
             _SheetField(ctrl: nameCtrl, label: 'Route Name'),
             const SizedBox(height: 12),
             _SheetField(ctrl: codeCtrl, label: 'Route Code'),
+            const SizedBox(height: 16),
+            const Text('Route Stops', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
-            _SheetField(
-              ctrl: stopsCtrl,
-              label: 'Stops',
-              hint: 'Enter each stop name on a new line',
-              maxLines: 5,
+            Column(
+              children: stops.asMap().entries.map((entry) {
+                final index = entry.key;
+                final stop = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Stop ${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                          IconButton(
+                            onPressed: () => setLocal(() => stops.removeAt(index)),
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                          ),
+                        ],
+                      ),
+                      _SheetField(ctrl: stop.nameCtrl, label: 'Name', hint: 'e.g. Main Gate'),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: _SheetField(ctrl: stop.latCtrl, label: 'Latitude', hint: 'e.g. 24.8607', type: TextInputType.number)),
+                          const SizedBox(width: 10),
+                          Expanded(child: _SheetField(ctrl: stop.lngCtrl, label: 'Longitude', hint: 'e.g. 67.0011', type: TextInputType.number)),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton(
+                onPressed: () => setLocal(() => stops.add(_RouteStop())),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF4A9EFF)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Add Stop', style: TextStyle(color: Color(0xFF4A9EFF), fontWeight: FontWeight.w700)),
+              ),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -165,7 +231,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                   await ApiService.updateRoute(auth.token!, route['_id'], {
                     'routeName': nameCtrl.text.trim(),
                     'routeCode': codeCtrl.text.trim(),
-                    'stops': _parseStops(stopsCtrl.text),
+                    'stops': stops.asMap().entries.map((entry) => entry.value.toJson(entry.key)).toList(),
                   });
                   Navigator.pop(ctx);
                   _load();
@@ -182,7 +248,9 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+  );
   }
 
   Future<void> _deleteRoute(String id) async {
@@ -256,9 +324,8 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(height: 4),
-                            Text('Code: ${route['routeCode'] ?? ''}',
-                                style: const TextStyle(color: Color(0xFF8892A4), fontSize: 12)),
-                            Text('Stops: ${(route['stops'] as List?)?.length ?? 0}',
+                            Text(
+                                'Code: ${route['routeCode'] ?? ''} · Stops: ${(route['stops'] as List?)?.length ?? 0}',
                                 style: const TextStyle(color: Color(0xFF8892A4), fontSize: 12)),
                           ],
                         ),
@@ -268,6 +335,10 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                             PopupMenuItem(
                               onTap: () => _showEditRouteDialog(route),
                               child: const Text('Edit', style: TextStyle(color: Colors.white)),
+                            ),
+                            PopupMenuItem(
+                              onTap: () => _showEditRouteDialog(route),
+                              child: const Text('Manage Stops', style: TextStyle(color: Colors.white)),
                             ),
                             PopupMenuItem(
                               onTap: () => _deleteRoute(route['_id']),
@@ -281,6 +352,24 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                 ),
     );
   }
+}
+
+class _RouteStop {
+  final TextEditingController nameCtrl;
+  final TextEditingController latCtrl;
+  final TextEditingController lngCtrl;
+
+  _RouteStop({String name = '', String latitude = '', String longitude = ''})
+      : nameCtrl = TextEditingController(text: name),
+        latCtrl = TextEditingController(text: latitude),
+        lngCtrl = TextEditingController(text: longitude);
+
+  Map<String, dynamic> toJson(int index) => {
+        'order': index + 1,
+        'name': nameCtrl.text.trim(),
+        'latitude': double.tryParse(latCtrl.text.trim()) ?? 0.0,
+        'longitude': double.tryParse(lngCtrl.text.trim()) ?? 0.0,
+      };
 }
 
 class _SheetField extends StatelessWidget {

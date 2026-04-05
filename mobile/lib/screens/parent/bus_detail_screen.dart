@@ -8,17 +8,16 @@ class BusDetailScreen extends StatelessWidget {
   const BusDetailScreen({super.key, required this.bus});
 
   Future<void> _makeCall(String? phone, BuildContext context) async {
-    if (phone == null || phone.isEmpty) {
+    if (phone == null || phone.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Phone number not available'),
         backgroundColor: Colors.orange,
       ));
       return;
     }
-    final uri = Uri(scheme: 'tel', path: phone);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
+    final sanitizedPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri(scheme: 'tel', path: sanitizedPhone);
+    if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Could not launch dialer'),
         backgroundColor: Colors.red,
