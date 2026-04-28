@@ -8,6 +8,7 @@ import 'bus_list_screen.dart';
 import 'registration_screen.dart';
 import 'my_registrations_screen.dart';
 import 'live_tracking_screen.dart';
+import '../shared/notices_screen.dart';
 
 class ParentHome extends StatefulWidget {
   const ParentHome({super.key});
@@ -55,6 +56,12 @@ class _ParentHomeState extends State<ParentHome> {
         onRefresh: _loadData,
         onRegister: () => setState(() => _currentIndex = 2),
         onViewBuses: () => setState(() => _currentIndex = 1),
+        onOpenNotices: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const NoticesScreen()),
+          );
+        },
       ),
       approved.isNotEmpty
           ? _AssignedBusPage(registration: approved.first)
@@ -99,6 +106,7 @@ class _DashboardTab extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onRegister;
   final VoidCallback onViewBuses;
+  final VoidCallback onOpenNotices;
 
   const _DashboardTab({
     required this.userName,
@@ -108,6 +116,7 @@ class _DashboardTab extends StatelessWidget {
     required this.onRefresh,
     required this.onRegister,
     required this.onViewBuses,
+    required this.onOpenNotices,
   });
 
   @override
@@ -203,6 +212,13 @@ class _DashboardTab extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              _ActionButton(
+                icon: Icons.campaign_rounded,
+                label: 'Notice Board',
+                color: const Color(0xFFF7C948),
+                onTap: onOpenNotices,
               ),
             ],
           ),

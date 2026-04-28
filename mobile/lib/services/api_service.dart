@@ -169,6 +169,80 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  // ── Notices ──────────────────────────────────────────────
+  static Future<List> getNotices(String token, {bool includeExpired = false}) async {
+    final res = await http
+        .get(
+          Uri.parse('$baseUrl/notices?includeExpired=$includeExpired'),
+          headers: headers(token),
+        )
+        .timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to load notices');
+  }
+
+  static Future<Map> createNotice(
+    String token, {
+    required String title,
+    required String message,
+    required String audience,
+    required String priority,
+    String attachmentUrl = '',
+    String? expiresAt,
+    File? attachmentFile,
+    List<int>? attachmentBytes,
+    String? attachmentName,
+  }) async {
+    final uri = Uri.parse('$baseUrl/notices');
+    final req = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['title'] = title
+      ..fields['message'] = message
+      ..fields['audience'] = audience
+      ..fields['priority'] = priority;
+
+    if (attachmentUrl.trim().isNotEmpty) {
+      req.fields['attachmentUrl'] = attachmentUrl.trim();
+    }
+    if (expiresAt != null && expiresAt.trim().isNotEmpty) {
+      req.fields['expiresAt'] = expiresAt;
+    }
+    if (attachmentFile != null) {
+      req.files.add(await http.MultipartFile.fromPath(
+        'attachment',
+        attachmentFile.path,
+      ));
+    } else if (attachmentBytes != null && attachmentBytes.isNotEmpty) {
+      req.files.add(http.MultipartFile.fromBytes(
+        'attachment',
+        attachmentBytes,
+        filename: attachmentName ?? 'attachment.bin',
+      ));
+    }
+
+    final streamed = await req.send().timeout(_timeout);
+    final res = await http.Response.fromStream(streamed);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 201) {
+      throw Exception(body['message'] ?? 'Failed to create notice');
+    }
+    return body;
+  }
+
+  static Future<Map> deleteNotice(String token, String id) async {
+    final res = await http
+        .delete(
+          Uri.parse('$baseUrl/notices/$id'),
+          headers: headers(token),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      throw Exception(body['message'] ?? 'Failed to delete notice');
+    }
+    return body;
+  }
+
   // ── Auth ──────────────────────────────────────────────────
   static Future<Map> forgotPassword(String email) async {
     final res = await http.post(

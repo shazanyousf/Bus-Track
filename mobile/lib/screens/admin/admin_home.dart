@@ -8,6 +8,7 @@ import 'admin_requests_screen.dart';
 import 'admin_drivers_screen.dart';
 import 'admin_routes_screen.dart';
 import 'admin_settings_screen.dart';
+import '../shared/notices_screen.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
@@ -22,11 +23,15 @@ class _AdminHomeState extends State<AdminHome> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      _AdminDashboard(onManageDepartments: () => setState(() => _currentIndex = 5)),
+      _AdminDashboard(
+        onManageDepartments: () => setState(() => _currentIndex = 6),
+        onManageNotices: () => setState(() => _currentIndex = 5),
+      ),
       const AdminRoutesScreen(),
       const AdminBusesScreen(),
       const AdminRequestsScreen(),
       const AdminDriversScreen(),
+      const NoticesScreen(adminMode: true),
       const AdminSettingsScreen(),
     ];
 
@@ -52,6 +57,7 @@ class _AdminHomeState extends State<AdminHome> {
             BottomNavigationBarItem(icon: Icon(Icons.directions_bus_rounded), label: 'Buses'),
             BottomNavigationBarItem(icon: Icon(Icons.assignment_rounded), label: 'Requests'),
             BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Drivers'),
+            BottomNavigationBarItem(icon: Icon(Icons.campaign_rounded), label: 'Notices'),
             BottomNavigationBarItem(icon: Icon(Icons.account_tree_rounded), label: 'Departments'),
           ],
         ),
@@ -61,9 +67,13 @@ class _AdminHomeState extends State<AdminHome> {
 }
 
 class _AdminDashboard extends StatefulWidget {
-  const _AdminDashboard({required this.onManageDepartments});
+  const _AdminDashboard({
+    required this.onManageDepartments,
+    required this.onManageNotices,
+  });
 
   final VoidCallback onManageDepartments;
+  final VoidCallback onManageNotices;
 
   @override
   State<_AdminDashboard> createState() => _AdminDashboardState();
@@ -196,6 +206,29 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 ),
                 const SizedBox(height: 24),
 
+                Row(
+                  children: [
+                    Expanded(
+                      child: _QuickActionCard(
+                        icon: Icons.campaign_rounded,
+                        label: 'Notice Board',
+                        color: const Color(0xFFFF6B35),
+                        onTap: widget.onManageNotices,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _QuickActionCard(
+                        icon: Icons.account_tree_rounded,
+                        label: 'Manage Departments',
+                        color: const Color(0xFF4A9EFF),
+                        onTap: widget.onManageDepartments,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
 
                 const Text('Recent Requests',
                     style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
@@ -294,6 +327,51 @@ class _StatCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF16213E),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

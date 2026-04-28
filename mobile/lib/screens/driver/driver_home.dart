@@ -8,6 +8,7 @@ import '../../services/socket_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../login_screen.dart';
+import '../shared/notices_screen.dart';
 
 class DriverHome extends StatefulWidget {
   const DriverHome({super.key});
@@ -337,6 +338,29 @@ class _DriverHomeState extends State<DriverHome> {
                               ),
                             ),
                         ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const NoticesScreen()),
+                      );
+                    },
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F0F1A).withOpacity(0.9),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF2A3A5C)),
+                      ),
+                      child: const Icon(
+                        Icons.campaign_rounded,
+                        color: Color(0xFF8892A4),
+                        size: 18,
                       ),
                     ),
                   ),

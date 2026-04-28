@@ -196,10 +196,10 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
             ],
           ),
 
-          // ── Top bar ─────────────────────────────────────────
+// ── Top bar ─────────────────────────────────────────
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 8),
               child: Row(
                 children: [
                   GestureDetector(
@@ -207,9 +207,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                     child: Container(
                       width: 42, height: 42,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F0F1A).withOpacity(0.85),
+                        color: const Color(0xFF1A1A2E).withOpacity(0.25),
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF2A3A5C)),
+                        border: Border.all(color: const Color(0xFF64748B)),
                       ),
                       child: const Icon(Icons.arrow_back_rounded,
                           color: Colors.white, size: 20),
@@ -221,9 +221,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F0F1A).withOpacity(0.55),
+                        color: const Color(0xFF1A1A2E).withOpacity(0.25),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF2A3A5C)),
+                        border: Border.all(color: const Color(0xFF64748B)),
                       ),
                       child: Row(
                         children: [
@@ -305,11 +305,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
             builder: (context, scrollController) {
               return Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F0F1A).withOpacity(0.5),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(24)),
-                  border: const Border(
-                      top: BorderSide(color: Color(0xFF2A3A5C))),
+                  color: const Color(0xFF1E293B).withOpacity(0.3),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  border: const Border(top: BorderSide(color: Color(0xFF64748B))),
                 ),
                 child: ListView(
                   controller: scrollController,

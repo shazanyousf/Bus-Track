@@ -2,6 +2,7 @@ const express    = require('express');
 const mongoose   = require('mongoose');
 const cors       = require('cors');
 const http       = require('http');
+const path       = require('path');
 const { Server } = require('socket.io');
 require('dotenv').config();
 
@@ -13,6 +14,7 @@ const io     = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ── Request Logging Middleware ──────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -34,11 +36,12 @@ app.use('/api/registrations', require('./routes/registrations'));
 app.use('/api/routes',        require('./routes/busRoutes'));
 app.use('/api/settings',      require('./routes/settings'));
 app.use('/api/students',      require('./routes/students'));
+app.use('/api/notices',       require('./routes/notices'));
 
 app.get('/api', (req, res) =>
   res.json({
     message: 'BusTrack University API is running',
-    routes: ['/api/auth', '/api/buses', '/api/drivers', '/api/routes', '/api/registrations', '/api/settings', '/api/students']
+    routes: ['/api/auth', '/api/buses', '/api/drivers', '/api/routes', '/api/registrations', '/api/settings', '/api/students', '/api/notices']
   })
 );
 
