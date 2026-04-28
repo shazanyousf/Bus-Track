@@ -24,6 +24,9 @@ class _AdminHomeState extends State<AdminHome> {
   Widget build(BuildContext context) {
     final pages = [
       _AdminDashboard(
+        onOpenBuses: () => setState(() => _currentIndex = 2),
+        onOpenRequests: () => setState(() => _currentIndex = 3),
+        onOpenDrivers: () => setState(() => _currentIndex = 4),
         onManageDepartments: () => setState(() => _currentIndex = 6),
         onManageNotices: () => setState(() => _currentIndex = 5),
       ),
@@ -37,7 +40,10 @@ class _AdminHomeState extends State<AdminHome> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
-      body: pages[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: pages,
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Color(0xFF16213E),
@@ -45,7 +51,10 @@ class _AdminHomeState extends State<AdminHome> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
+          onTap: (i) {
+            if (i == _currentIndex) return;
+            setState(() => _currentIndex = i);
+          },
           backgroundColor: Colors.transparent,
           selectedItemColor: const Color(0xFFFF6B35),
           unselectedItemColor: const Color(0xFF8892A4),
@@ -68,10 +77,16 @@ class _AdminHomeState extends State<AdminHome> {
 
 class _AdminDashboard extends StatefulWidget {
   const _AdminDashboard({
+    required this.onOpenBuses,
+    required this.onOpenRequests,
+    required this.onOpenDrivers,
     required this.onManageDepartments,
     required this.onManageNotices,
   });
 
+  final VoidCallback onOpenBuses;
+  final VoidCallback onOpenRequests;
+  final VoidCallback onOpenDrivers;
   final VoidCallback onManageDepartments;
   final VoidCallback onManageNotices;
 
@@ -114,6 +129,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   Widget build(BuildContext context) {
     final auth    = context.watch<AuthService>();
     final pending = _registrations.where((r) => r['status'] == 'pending').length;
+    final adminName = (auth.user?['name'] as String?)?.trim();
 
     return SafeArea(
       child: RefreshIndicator(
@@ -125,64 +141,118 @@ class _AdminDashboardState extends State<_AdminDashboard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Row(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4A9EFF).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(99),
+                      border: Border.all(
+                        color: const Color(0xFF4A9EFF).withValues(alpha: 0.45),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('Admin Panel',
-                            style: TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
-                        Text(auth.user?['name'] ?? 'Administrator',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800)),
+                        Icon(Icons.insights_rounded, color: Color(0xFF79BCFF), size: 15),
+                        SizedBox(width: 6),
+                        Text(
+                          'Admin Overview',
+                          style: TextStyle(
+                            color: Color(0xFF94CBFF),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          backgroundColor: const Color(0xFF16213E),
-                          title: const Text('Sign Out',
-                              style: TextStyle(color: Colors.white)),
-                          content: const Text('Sign out of admin panel?',
-                              style: TextStyle(color: Color(0xFF8892A4))),
-                          actions: [
-                            TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancel')),
-                            TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Sign Out',
-                                    style: TextStyle(color: Colors.red))),
-                          ],
-                        ),
-                      );
-                      if (confirm == true && context.mounted) {
-                        await context.read<AuthService>().logout();
-                        Navigator.pushReplacement(context,
-                            MaterialPageRoute(builder: (_) => const LoginScreen()));
-                      }
-                    },
-                    child: Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                            colors: [Color(0xFF7B52FF), Color(0xFF4A9EFF)]),
+                  const Spacer(),
+                  if (_loading)
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFFF6B35),
                       ),
-                      child: const Center(
-                          child: Icon(Icons.shield_rounded,
-                              color: Colors.white, size: 22)),
                     ),
-                  ),
                 ],
+              ),
+              const SizedBox(height: 12),
+
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF16213E), Color(0xFF132742)],
+                  ),
+                  border: Border.all(color: const Color(0xFF2A3A5C)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Admin Panel',
+                              style: TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
+                          const SizedBox(height: 2),
+                          Text(adminName == null || adminName.isEmpty ? 'Administrator' : adminName,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            backgroundColor: const Color(0xFF16213E),
+                            title: const Text('Sign Out',
+                                style: TextStyle(color: Colors.white)),
+                            content: const Text('Sign out of admin panel?',
+                                style: TextStyle(color: Color(0xFF8892A4))),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Cancel')),
+                              TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Sign Out',
+                                      style: TextStyle(color: Colors.red))),
+                            ],
+                          ),
+                        );
+                        if (confirm == true && context.mounted) {
+                          await context.read<AuthService>().logout();
+                          Navigator.pushReplacement(context,
+                              MaterialPageRoute(builder: (_) => const LoginScreen()));
+                        }
+                      },
+                      child: Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                              colors: [Color(0xFF7B52FF), Color(0xFF4A9EFF)]),
+                        ),
+                        child: const Center(
+                            child: Icon(Icons.shield_rounded,
+                                color: Colors.white, size: 22)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -190,22 +260,56 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)))
               else ...[
                 // Stats grid
+                const _SectionHeader(
+                  title: 'Live Snapshot',
+                  subtitle: 'Tap a metric card to jump to that section',
+                ),
+                const SizedBox(height: 12),
                 GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.4,
+                  childAspectRatio: 1.25,
                   children: [
-                    _StatCard(label: 'Total Buses',   value: '${_buses.length}',         color: const Color(0xFFFF6B35), icon: Icons.directions_bus_rounded),
-                    _StatCard(label: 'Pending',        value: '$pending',                  color: const Color(0xFFF7C948), icon: Icons.hourglass_top_rounded),
-                    _StatCard(label: 'Drivers',        value: '${_drivers.length}',        color: const Color(0xFF4A9EFF), icon: Icons.person_rounded),
-                    _StatCard(label: 'Total Requests', value: '${_registrations.length}',  color: const Color(0xFF2ECC71), icon: Icons.assignment_rounded),
+                    _StatCard(
+                      label: 'Total Buses',
+                      value: '${_buses.length}',
+                      color: const Color(0xFFFF6B35),
+                      icon: Icons.directions_bus_rounded,
+                      onTap: widget.onOpenBuses,
+                    ),
+                    _StatCard(
+                      label: 'Pending',
+                      value: '$pending',
+                      color: const Color(0xFFF7C948),
+                      icon: Icons.hourglass_top_rounded,
+                      onTap: widget.onOpenRequests,
+                    ),
+                    _StatCard(
+                      label: 'Drivers',
+                      value: '${_drivers.length}',
+                      color: const Color(0xFF4A9EFF),
+                      icon: Icons.person_rounded,
+                      onTap: widget.onOpenDrivers,
+                    ),
+                    _StatCard(
+                      label: 'Total Requests',
+                      value: '${_registrations.length}',
+                      color: const Color(0xFF2ECC71),
+                      icon: Icons.assignment_rounded,
+                      onTap: widget.onOpenRequests,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
 
+                const _SectionHeader(
+                  title: 'Management',
+                  subtitle: 'Fast actions for notices and departments',
+                ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -230,8 +334,10 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 const SizedBox(height: 24),
 
 
-                const Text('Recent Requests',
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                const _SectionHeader(
+                  title: 'Recent Requests',
+                  subtitle: 'Latest registration updates from parents',
+                ),
                 const SizedBox(height: 12),
                 ..._registrations.take(5).map((reg) {
                   final bus    = reg['busId']  as Map? ?? {};
@@ -245,7 +351,11 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF16213E),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF16213E), Color(0xFF1A2A4D)],
+                      ),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: const Color(0xFF2A3A5C)),
                     ),
@@ -271,9 +381,9 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: sc.withOpacity(0.15),
+                            color: sc.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: sc.withOpacity(0.4)),
+                            border: Border.all(color: sc.withValues(alpha: 0.4)),
                           ),
                           child: Text(
                             status[0].toUpperCase() + status.substring(1),
@@ -298,35 +408,62 @@ class _StatCard extends StatelessWidget {
   final String label, value;
   final Color color;
   final IconData icon;
+  final VoidCallback? onTap;
 
   const _StatCard(
-      {required this.label, required this.value, required this.color, required this.icon});
+      {required this.label,
+      required this.value,
+      required this.color,
+      required this.icon,
+      this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF16213E),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A3A5C)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Icon(icon, color: color, size: 22),
-          Column(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF16213E),
+                color.withValues(alpha: 0.12),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF2A3A5C)),
+          ),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(value,
-                  style: TextStyle(
-                      color: color, fontSize: 26, fontWeight: FontWeight.w900)),
-              Text(label,
-                  style: const TextStyle(color: Color(0xFF8892A4), fontSize: 11)),
+              Row(
+                children: [
+                  Icon(icon, color: color, size: 22),
+                  const Spacer(),
+                  Icon(Icons.arrow_forward_rounded,
+                      color: color.withValues(alpha: 0.8), size: 16),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(value,
+                      style: TextStyle(
+                          color: color, fontSize: 26, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 2),
+                  Text(label,
+                      style: const TextStyle(color: Color(0xFF8892A4), fontSize: 11)),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -347,32 +484,85 @@ class _QuickActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF16213E),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.35)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF16213E),
+                color.withValues(alpha: 0.2),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-          ],
+              Icon(Icons.chevron_right_rounded,
+                  color: color.withValues(alpha: 0.85), size: 18),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionHeader({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: Color(0xFF8892A4),
+            fontSize: 12,
+          ),
+        ),
+      ],
     );
   }
 }

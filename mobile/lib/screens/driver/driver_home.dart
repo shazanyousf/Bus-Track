@@ -20,6 +20,7 @@ class DriverHome extends StatefulWidget {
 class _DriverHomeState extends State<DriverHome> {
   final SocketService _socket = SocketService();
   final MapController _mapController = MapController();
+  int _currentIndex = 0;
 
   List   _buses         = [];
   Map?   _selectedBus;
@@ -263,10 +264,66 @@ class _DriverHomeState extends State<DriverHome> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
 
+    final pages = [
+      _buildDashboard(auth),
+      const NoticesScreen(),
+    ];
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
-      body: Stack(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: pages,
+      ),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF16213E),
+          border: Border(top: BorderSide(color: Color(0xFF2A3A5C))),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (i) {
+            if (i == _currentIndex) return;
+            setState(() => _currentIndex = i);
+          },
+          backgroundColor: Colors.transparent,
+          selectedItemColor: const Color(0xFFFF6B35),
+          unselectedItemColor: const Color(0xFF8892A4),
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_rounded),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.campaign_rounded),
+              label: 'Notices',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboard(AuthService auth) {
+    return Stack(
         children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0xFF0F0F1A).withValues(alpha: 0.08),
+                    const Color(0xFF0F0F1A).withValues(alpha: 0.4),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           // ── Google Map ─────────────────────────────────────
           FlutterMap(
             mapController: _mapController,
@@ -292,101 +349,131 @@ class _DriverHomeState extends State<DriverHome> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F0F1A).withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF2A3A5C)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Text('🚌', style: TextStyle(fontSize: 20)),
-                          const SizedBox(width: 10),
-                          const Text('Driver Mode',
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4A9EFF).withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(
+                              color: const Color(0xFF4A9EFF).withValues(alpha: 0.4)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.navigation_rounded,
+                                color: Color(0xFF77B8FF), size: 14),
+                            SizedBox(width: 6),
+                            Text(
+                              'Driver Command',
                               style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15)),
-                          const Spacer(),
-                          if (_isTracking)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2ECC71).withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                    color: const Color(0xFF2ECC71)
-                                        .withOpacity(0.4)),
-                              ),
-                              child: Row(
-                                children: [
-                                  _PulseDot(color: const Color(0xFF2ECC71)),
-                                  const SizedBox(width: 5),
-                                  const Text('BROADCASTING',
-                                      style: TextStyle(
-                                          color: Color(0xFF2ECC71),
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.5)),
-                                ],
+                                color: Color(0xFF8EC5FF),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const NoticesScreen()),
-                      );
-                    },
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F0F1A).withOpacity(0.9),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF2A3A5C)),
-                      ),
-                      child: const Icon(
-                        Icons.campaign_rounded,
-                        color: Color(0xFF8892A4),
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: () async {
-                      final navigator = Navigator.of(context);
-                      _stopTracking();
-                      await auth.logout();
-                      if (!mounted) return;
-                      navigator.pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => const LoginScreen(),
+                          ],
                         ),
-                      );
-                    },
-                    child: Container(
-                      width: 42, height: 42,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F0F1A).withOpacity(0.9),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF2A3A5C)),
                       ),
-                      child: const Icon(Icons.logout_rounded,
-                          color: Color(0xFF8892A4), size: 18),
-                    ),
+                      const Spacer(),
+                      if (_loading)
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFFFF6B35),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFF0F172A), Color(0xFF132742)],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFF2A3A5C)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF6B35).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.directions_bus_rounded,
+                                    color: Color(0xFFFFA15F), size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              const Text('Driver Mode',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15)),
+                              const Spacer(),
+                              if (_isTracking)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF2ECC71).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                        color: const Color(0xFF2ECC71)
+                                            .withValues(alpha: 0.4)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      _PulseDot(color: const Color(0xFF2ECC71)),
+                                      const SizedBox(width: 5),
+                                      const Text('BROADCASTING',
+                                          style: TextStyle(
+                                              color: Color(0xFF2ECC71),
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.5)),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _TopCircleButton(
+                        icon: Icons.campaign_rounded,
+                        onTap: () => setState(() => _currentIndex = 1),
+                      ),
+                      const SizedBox(width: 10),
+                      _TopCircleButton(
+                        icon: Icons.logout_rounded,
+                        onTap: () async {
+                          final navigator = Navigator.of(context);
+                          _stopTracking();
+                          await auth.logout();
+                          if (!mounted) return;
+                          navigator.pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => const LoginScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -398,7 +485,11 @@ class _DriverHomeState extends State<DriverHome> {
             bottom: 0, left: 0, right: 0,
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF0F0F1A).withOpacity(0.97),
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF11182D), Color(0xFF0F0F1A)],
+                ),
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(24)),
                 border: const Border(
@@ -411,7 +502,7 @@ class _DriverHomeState extends State<DriverHome> {
                   Container(
                     width: 40, height: 4,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2A3A5C),
+                      color: const Color(0xFF3A4D73),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -419,6 +510,11 @@ class _DriverHomeState extends State<DriverHome> {
 
                   // Bus selector (only when not tracking)
                   if (!_isTracking) ...[
+                    const _DriverSectionHeader(
+                      title: 'Trip Setup',
+                      subtitle: 'Select your bus before broadcasting route updates',
+                    ),
+                    const SizedBox(height: 8),
                     const Align(
                       alignment: Alignment.centerLeft,
                       child: Text('SELECT YOUR BUS',
@@ -471,6 +567,11 @@ class _DriverHomeState extends State<DriverHome> {
 
                   // Live stats (only when tracking)
                   if (_isTracking) ...[
+                    const _DriverSectionHeader(
+                      title: 'Live Snapshot',
+                      subtitle: 'Real-time speed, duration and active bus status',
+                    ),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         _StatBox(
@@ -502,7 +603,11 @@ class _DriverHomeState extends State<DriverHome> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF111827),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF16213E), Color(0xFF1D2D53)],
+                        ),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: const Color(0xFF2A3A5C)),
                       ),
@@ -549,7 +654,7 @@ class _DriverHomeState extends State<DriverHome> {
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF2ECC71),
+                                            color: const Color(0xFF2ECC71),
                                           borderRadius: BorderRadius.circular(10),
                                         ),
                                         child: const Text('Send', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
@@ -623,8 +728,7 @@ class _DriverHomeState extends State<DriverHome> {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 }
 
@@ -665,6 +769,68 @@ class _PulseDotState extends State<_PulseDot>
       );
 }
 
+class _TopCircleButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TopCircleButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Ink(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F172A), Color(0xFF132742)],
+            ),
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFF2A3A5C)),
+          ),
+          child: Icon(icon, color: const Color(0xFF9AA7BE), size: 18),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverSectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _DriverSectionHeader({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: Color(0xFF8892A4),
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _StatBox extends StatelessWidget {
   final String label, value;
   final Color color;
@@ -682,9 +848,16 @@ class _StatBox extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF16213E),
+              color.withValues(alpha: 0.18),
+            ],
+          ),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Column(
           children: [
@@ -698,6 +871,7 @@ class _StatBox extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 2),
             Text(label,
                 style: const TextStyle(
                     color: Color(0xFF8892A4), fontSize: 9)),

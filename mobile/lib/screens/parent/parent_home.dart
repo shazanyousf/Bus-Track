@@ -56,6 +56,7 @@ class _ParentHomeState extends State<ParentHome> {
         onRefresh: _loadData,
         onRegister: () => setState(() => _currentIndex = 2),
         onViewBuses: () => setState(() => _currentIndex = 1),
+        onOpenPending: () => setState(() => _currentIndex = 3),
         onOpenNotices: () {
           Navigator.push(
             context,
@@ -72,7 +73,10 @@ class _ParentHomeState extends State<ParentHome> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
-      body: pages[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: pages,
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Color(0xFF16213E),
@@ -80,7 +84,10 @@ class _ParentHomeState extends State<ParentHome> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
+          onTap: (i) {
+            if (i == _currentIndex) return;
+            setState(() => _currentIndex = i);
+          },
           backgroundColor: Colors.transparent,
           selectedItemColor: const Color(0xFFFF6B35),
           unselectedItemColor: const Color(0xFF8892A4),
@@ -106,6 +113,7 @@ class _DashboardTab extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onRegister;
   final VoidCallback onViewBuses;
+  final VoidCallback onOpenPending;
   final VoidCallback onOpenNotices;
 
   const _DashboardTab({
@@ -116,11 +124,14 @@ class _DashboardTab extends StatelessWidget {
     required this.onRefresh,
     required this.onRegister,
     required this.onViewBuses,
+    required this.onOpenPending,
     required this.onOpenNotices,
   });
 
   @override
   Widget build(BuildContext context) {
+    final greetingName = userName.trim().isEmpty ? 'Parent' : userName.trim();
+
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () async => onRefresh(),
@@ -131,29 +142,88 @@ class _DashboardTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Row(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF6B35).withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(99),
+                      border: Border.all(
+                        color: const Color(0xFFFF6B35).withValues(alpha: 0.45),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('Good Day,',
-                            style: TextStyle(color: Color(0xFF8892A4), fontSize: 14)),
-                        Text(userName,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800)),
+                        Icon(Icons.auto_graph_rounded, color: Color(0xFFFFA15F), size: 15),
+                        SizedBox(width: 6),
+                        Text(
+                          'Dashboard Overview',
+                          style: TextStyle(
+                            color: Color(0xFFFFB582),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  _Avatar(name: userName),
+                  const Spacer(),
+                  if (loading)
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFFF6B35),
+                      ),
+                    ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
+
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF16213E), Color(0xFF132742)],
+                  ),
+                  border: Border.all(color: const Color(0xFF2A3A5C)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Good Day,',
+                              style: TextStyle(color: Color(0xFF8892A4), fontSize: 14)),
+                          const SizedBox(height: 2),
+                          Text(greetingName,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    ),
+                    _Avatar(name: greetingName),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
 
               // Stats row
+              const _SectionHeader(
+                title: 'Live Snapshot',
+                subtitle: 'Tap a card to jump to that section',
+              ),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   _StatCard(
@@ -161,6 +231,7 @@ class _DashboardTab extends StatelessWidget {
                     value: approved.length.toString(),
                     color: const Color(0xFF2ECC71),
                     icon: Icons.directions_bus_rounded,
+                    onTap: onViewBuses,
                   ),
                   const SizedBox(width: 12),
                   _StatCard(
@@ -168,29 +239,28 @@ class _DashboardTab extends StatelessWidget {
                     value: pending.length.toString(),
                     color: const Color(0xFFF7C948),
                     icon: Icons.hourglass_top_rounded,
+                    onTap: onOpenPending,
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
 
               // Assigned bus card
               if (approved.isNotEmpty) ...[
-                const Text('Assigned Bus',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700)),
+                const _SectionHeader(
+                  title: 'Assigned Bus',
+                  subtitle: 'Your approved bus and driver details',
+                ),
                 const SizedBox(height: 12),
                 _AssignedBusCard(registration: approved.first),
                 const SizedBox(height: 24),
               ],
 
               // Quick actions
-              const Text('Quick Actions',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700)),
+              const _SectionHeader(
+                title: 'Quick Actions',
+                subtitle: 'Common tasks for faster access',
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -214,11 +284,26 @@ class _DashboardTab extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              _ActionButton(
-                icon: Icons.campaign_rounded,
-                label: 'Notice Board',
-                color: const Color(0xFFF7C948),
-                onTap: onOpenNotices,
+              Row(
+                children: [
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.receipt_long_rounded,
+                      label: 'My Requests',
+                      color: const Color(0xFF7B52FF),
+                      onTap: onOpenPending,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.campaign_rounded,
+                      label: 'Notice Board',
+                      color: const Color(0xFFF7C948),
+                      onTap: onOpenNotices,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -284,36 +369,94 @@ class _StatCard extends StatelessWidget {
   final String label, value;
   final Color color;
   final IconData icon;
+  final VoidCallback? onTap;
 
   const _StatCard(
       {required this.label,
       required this.value,
       required this.color,
-      required this.icon});
+      required this.icon,
+      this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF16213E),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF2A3A5C)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 10),
-            Text(value,
-                style: TextStyle(
-                    color: color, fontSize: 26, fontWeight: FontWeight.w900)),
-            Text(label,
-                style: const TextStyle(color: Color(0xFF8892A4), fontSize: 12)),
-          ],
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF16213E),
+                  color.withValues(alpha: 0.12),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF2A3A5C)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, color: color, size: 22),
+                const SizedBox(height: 10),
+                Text(value,
+                    style: TextStyle(
+                        color: color, fontSize: 26, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 2),
+                Text(label,
+                    style: const TextStyle(color: Color(0xFF8892A4), fontSize: 12)),
+                const SizedBox(height: 8),
+                Text(
+                  'Tap to open',
+                  style: TextStyle(
+                    color: color.withValues(alpha: 0.8),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionHeader({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: Color(0xFF8892A4),
+            fontSize: 12,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -373,7 +516,11 @@ class _AssignedBusCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF16213E),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF16213E), Color(0xFF1A2A4D)],
+        ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFF2A3A5C)),
       ),
@@ -385,11 +532,11 @@ class _AssignedBusCard extends StatelessWidget {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF6B35).withOpacity(0.15),
+                  color: const Color(0xFFFF6B35).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Center(
-                    child: Text('🚌', style: TextStyle(fontSize: 24))),
+                    child: Icon(Icons.directions_bus_rounded, color: Color(0xFFFFA15F), size: 26)),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -411,10 +558,10 @@ class _AssignedBusCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2ECC71).withOpacity(0.15),
+                  color: const Color(0xFF2ECC71).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                      color: const Color(0xFF2ECC71).withOpacity(0.4)),
+                    color: const Color(0xFF2ECC71).withValues(alpha: 0.4)),
                 ),
                 child: const Text('Active',
                     style: TextStyle(
@@ -429,7 +576,15 @@ class _AssignedBusCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Text('👨', style: TextStyle(fontSize: 18)),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4A9EFF).withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.person_rounded, color: Color(0xFF4A9EFF), size: 18),
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -628,23 +783,46 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 26),
-            const SizedBox(height: 8),
-            Text(label,
-                style: TextStyle(
-                    color: color, fontSize: 13, fontWeight: FontWeight.w700)),
-          ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF16213E),
+                color.withValues(alpha: 0.2),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.32)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(label,
+                    style: TextStyle(
+                        color: color, fontSize: 13, fontWeight: FontWeight.w700)),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  color: color.withValues(alpha: 0.8), size: 20),
+            ],
+          ),
         ),
       ),
     );
