@@ -9,9 +9,7 @@ class ApiService {
   static String get baseUrl {
     final envUrl = dotenv.env['API_BASE_URL'];
     if (envUrl != null && envUrl.isNotEmpty) return envUrl;
-    return Platform.isAndroid
-        ? 'http://10.0.2.2:3000/api'
-        : 'http://localhost:3000/api';
+    return 'https://bus-track-itv7.onrender.com/api';
   }
 
   static Map<String, String> headers(String token) => {

@@ -14,7 +14,7 @@ class SocketService {
   String get socketUrl {
     final envUrl = dotenv.env['SOCKET_URL'];
     if (envUrl != null && envUrl.isNotEmpty) return envUrl;
-    return Platform.isAndroid ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
+    return 'https://bus-track-itv7.onrender.com';
   }
 
   /// Call once when the app starts or the user logs in.
