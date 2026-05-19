@@ -2,14 +2,45 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiService {
   static const Duration _timeout = Duration(seconds: 20);
   
   static String get baseUrl {
     final envUrl = dotenv.env['API_BASE_URL'];
-    if (envUrl != null && envUrl.isNotEmpty) return envUrl;
-    return 'https://bus-track-itv7.onrender.com/api';
+    if (envUrl != null && envUrl.isNotEmpty) return _resolveLocalHost(envUrl);
+    return _defaultBaseUrl();
+  }
+
+  static String _defaultBaseUrl() {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'http://10.0.2.2:3000/api';
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return 'http://localhost:3000/api';
+      default:
+        return 'http://127.0.0.1:3000/api';
+    }
+  }
+
+  static String _resolveLocalHost(String url) {
+    final parsed = Uri.tryParse(url);
+    if (parsed == null) return url;
+
+    if (parsed.host != '127.0.0.1' && parsed.host != 'localhost') {
+      return url;
+    }
+
+    final host = switch (defaultTargetPlatform) {
+      TargetPlatform.android => '10.0.2.2',
+      TargetPlatform.iOS => 'localhost',
+      TargetPlatform.macOS => 'localhost',
+      _ => parsed.host,
+    };
+
+    return parsed.replace(host: host).toString();
   }
 
   static Map<String, String> headers(String token) => {
@@ -91,6 +122,39 @@ class ApiService {
   static Future<Map> deleteDriver(String token, String id) async {
     final res = await http.delete(Uri.parse('$baseUrl/drivers/$id'),
         headers: headers(token)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  // ── Users (admin) ──────────────────────────────────────
+  static Future<List> getUsers(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/users'), headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to load users');
+  }
+
+  static Future<Map> updateUser(String token, String id, Map data) async {
+    final res = await http.put(Uri.parse('$baseUrl/users/$id'), headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map> deleteUser(String token, String id) async {
+    final res = await http.delete(Uri.parse('$baseUrl/users/$id'), headers: headers(token)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  // Current user (self)
+  static Future<Map> getCurrentUser(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/users/me'), headers: headers(token)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map> updateCurrentUser(String token, Map data) async {
+    final res = await http.put(Uri.parse('$baseUrl/users/me'), headers: headers(token), body: jsonEncode(data)).timeout(_timeout);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map> deleteCurrentUser(String token) async {
+    final res = await http.delete(Uri.parse('$baseUrl/users/me'), headers: headers(token)).timeout(_timeout);
     return jsonDecode(res.body);
   }
 

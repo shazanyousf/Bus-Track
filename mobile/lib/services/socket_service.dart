@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Singleton that manages one Socket.io connection for the whole app.
@@ -13,8 +13,40 @@ class SocketService {
 
   String get socketUrl {
     final envUrl = dotenv.env['SOCKET_URL'];
-    if (envUrl != null && envUrl.isNotEmpty) return envUrl;
-    return 'https://bus-track-itv7.onrender.com';
+    if (envUrl != null && envUrl.isNotEmpty) {
+      return _resolveLocalHost(envUrl);
+    }
+    return _defaultSocketUrl();
+  }
+
+  String _defaultSocketUrl() {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'http://10.0.2.2:3000';
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return 'http://localhost:3000';
+      default:
+        return 'http://127.0.0.1:3000';
+    }
+  }
+
+  String _resolveLocalHost(String url) {
+    final parsed = Uri.tryParse(url);
+    if (parsed == null) return url;
+
+    if (parsed.host != '127.0.0.1' && parsed.host != 'localhost') {
+      return url;
+    }
+
+    final host = switch (defaultTargetPlatform) {
+      TargetPlatform.android => '10.0.2.2',
+      TargetPlatform.iOS => 'localhost',
+      TargetPlatform.macOS => 'localhost',
+      _ => parsed.host,
+    };
+
+    return parsed.replace(host: host).toString();
   }
 
   /// Call once when the app starts or the user logs in.
@@ -44,12 +76,12 @@ class SocketService {
     required double speed,
   }) {
     _socket?.emit('driver:location', {
-  'busId': busId,
-  'lat': latitude,      // ✅ CHANGE HERE
-  'lng': longitude,     // ✅ CHANGE HERE
-  'speed': speed,
-  'timestamp': DateTime.now().toIso8601String(),
-});
+      'busId': busId,
+      'lat': latitude,
+      'lng': longitude,
+      'speed': speed,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
   }
 
   /// Parent calls this to listen to a specific bus.

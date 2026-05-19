@@ -37,6 +37,7 @@ app.use('/api/routes',        require('./routes/busRoutes'));
 app.use('/api/settings',      require('./routes/settings'));
 app.use('/api/students',      require('./routes/students'));
 app.use('/api/notices',       require('./routes/notices'));
+app.use('/api/users',         require('./routes/users'));
 
 app.get('/api', (req, res) =>
   res.json({
@@ -128,13 +129,13 @@ mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected');
     
-    server.listen(PORT, () =>
-      console.log(`🚀 Server running  →  http://localhost:${PORT}`));
+    server.listen(PORT, '0.0.0.0', () =>
+      console.log(`🚀 Server running  →  http://0.0.0.0:${PORT} (accessible from Android emulator at 10.0.2.2:${PORT})`));
   })
 
   .catch(err => {
     console.error('⚠️  MongoDB error:', err.message);
     console.log('Starting without DB (demo mode)...');
-    server.listen(PORT, () =>
-      console.log(`🚀 Server running  →  http://localhost:${PORT}`));
+    server.listen(PORT, '0.0.0.0', () =>
+      console.log(`🚀 Server running  →  http://0.0.0.0:${PORT} (accessible from Android emulator at 10.0.2.2:${PORT})`));
   });

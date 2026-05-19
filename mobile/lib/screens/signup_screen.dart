@@ -21,10 +21,14 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscure = true;
   bool _obscureConfirm = true;
   String _error = '';
+  String _success = '';  // ✨ NEW: Track success messages
   int _step = 0; // 0 = account details, 1 = email verification
 
   Future<void> _signup() async {
-    setState(() { _error = ''; });
+    setState(() { 
+      _error = ''; 
+      _success = '';
+    });
 
     // Validation
     if (_nameCtrl.text.trim().isEmpty) {
@@ -65,7 +69,8 @@ class _SignupScreenState extends State<SignupScreen> {
     if (result['success'] && result['verificationRequired'] == true) {
       setState(() {
         _step = 1;
-        _error = result['message'] ?? 'Verification code sent to email';
+        _error = '';
+        _success = result['message'] ?? 'Verification code sent to email';  // ✨ Success message
       });
       return;
     }
@@ -79,7 +84,10 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> _verifyCode() async {
-    setState(() { _error = ''; });
+    setState(() { 
+      _error = ''; 
+      _success = '';
+    });
     if (_codeCtrl.text.trim().isEmpty) {
       setState(() => _error = 'Please enter the verification code');
       return;
@@ -108,42 +116,13 @@ class _SignupScreenState extends State<SignupScreen> {
       backgroundColor: const Color(0xFF0F0F1A),
       body: SafeArea(
         child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              Center(
-                child: Column(
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                            colors: [Color(0xFFFF6B35), Color(0xFFFF8C55)]),
-                        boxShadow: [
-                          BoxShadow(
-                              color: const Color(0xFFFF6B35).withOpacity(0.3),
-                              blurRadius: 20)
-                        ],
-                      ),
-                      child: const Center(
-                          child: Text('🚌', style: TextStyle(fontSize: 36))),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('Create Account',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900)),
-                    const Text('Join BusTrack as a Parent',
-                        style:
-                            TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
-                  ],
-                ),
-              ),
+              _buildHeader(),
               const SizedBox(height: 28),
               if (_step == 0) ...[
                 _label('FULL NAME'),
@@ -155,7 +134,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 _field(_emailCtrl, 'example@gmail.com',
                     type: TextInputType.emailAddress),
                 const SizedBox(height: 14),
-                _label('PHONE (OPTIONAL)'),
+                _label('PHONE'),
                 const SizedBox(height: 8),
                 _field(_phoneCtrl, '+91 98765 43210',
                     type: TextInputType.phone),
@@ -270,6 +249,27 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
               ],
+              // ✨ SUCCESS MESSAGE (Green)
+              if (_success.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.green.withOpacity(0.5)),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child: Text(_success,
+                            style: const TextStyle(
+                                color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600))),
+                  ]),
+                ),
+              ],
+              // ✨ ERROR MESSAGE (Red)
               if (_error.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 Container(
@@ -345,6 +345,39 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Center(
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                  colors: [Color(0xFFFF6B35), Color(0xFFFF8C55)]),
+              boxShadow: [
+                BoxShadow(
+                    color: const Color(0xFFFF6B35).withOpacity(0.3),
+                    blurRadius: 20)
+              ],
+            ),
+            child: const Center(
+                child: Text('🚌', style: TextStyle(fontSize: 36))),
+          ),
+          const SizedBox(height: 16),
+          const Text('Create Account',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900)),
+          const Text('Join BusTrack as a Parent',
+              style: TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
+        ],
       ),
     );
   }

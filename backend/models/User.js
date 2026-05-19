@@ -3,14 +3,15 @@ const bcrypt   = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
   name:     { type: String, required: true },
-  email:    { type: String, required: true, unique: true, index: true },
+  email:    { type: String, required: true, unique: true, sparse: true, lowercase: true, trim: true },
   password: { type: String, required: true },
   role:     { type: String, enum: ['parent', 'admin', 'driver'], default: 'parent', index: true },
   phone:    { type: String, default: '' },
   busId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Bus', default: null },
   emailVerified: { type: Boolean, default: false },
-  emailVerificationCode: { type: String, default: null },
-  emailVerificationExpiry: { type: Date, default: null },
+  verificationCode: { type: String, default: null },
+  verificationExpiry: { type: Date, default: null },
+  verificationAttempts: { type: Number, default: 0 },
   resetCode: { type: String, default: null },
   resetCodeExpiry: { type: Date, default: null }
 }, { timestamps: true });

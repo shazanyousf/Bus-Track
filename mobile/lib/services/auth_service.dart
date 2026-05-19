@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService extends ChangeNotifier {
   String? _token;
@@ -17,10 +17,40 @@ class AuthService extends ChangeNotifier {
   bool get isAdmin => _user?['role'] == 'admin';
   String get baseUrl {
     final envUrl = dotenv.env['API_BASE_URL'];
-    if (envUrl != null && envUrl.isNotEmpty) return envUrl;
-    return Platform.isAndroid
-        ? 'http://10.0.2.2:3000/api'
-        : 'http://localhost:3000/api';
+    if (envUrl != null && envUrl.isNotEmpty) {
+      return _resolveLocalHost(envUrl);
+    }
+    return _defaultBaseUrl();
+  }
+
+  String _defaultBaseUrl() {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'http://10.0.2.2:3000/api';
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return 'http://localhost:3000/api';
+      default:
+        return 'http://127.0.0.1:3000/api';
+    }
+  }
+
+  String _resolveLocalHost(String url) {
+    final parsed = Uri.tryParse(url);
+    if (parsed == null) return url;
+
+    if (parsed.host != '127.0.0.1' && parsed.host != 'localhost') {
+      return url;
+    }
+
+    final host = switch (defaultTargetPlatform) {
+      TargetPlatform.android => '10.0.2.2',
+      TargetPlatform.iOS => 'localhost',
+      TargetPlatform.macOS => 'localhost',
+      _ => parsed.host,
+    };
+
+    return parsed.replace(host: host).toString();
   }
 
   Future<void> loadToken() async {
@@ -74,6 +104,8 @@ class AuthService extends ChangeNotifier {
 
   Future<Map<String, dynamic>> register(
       String name, String email, String password, String phone) async {
+    _isLoading = true;
+    notifyListeners();
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/auth/register'),
@@ -104,12 +136,24 @@ class AuthService extends ChangeNotifier {
       }
       return {'success': false, 'message': data['message']};
     } catch (e) {
-      return {'success': false, 'message': 'Connection error'};
+      final message = e.toString();
+      debugPrint('Register error: $message');
+      return {
+        'success': false,
+        'message': message.contains('timeout')
+            ? 'Connection timeout - Backend not responding at $baseUrl'
+            : 'Connection error: $message',
+      };
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
   Future<Map<String, dynamic>> verifyRegistrationCode(
       String email, String verificationCode) async {
+    _isLoading = true;
+    notifyListeners();
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/auth/verify-registration'),
@@ -134,7 +178,17 @@ class AuthService extends ChangeNotifier {
       }
       return {'success': false, 'message': data['message']};
     } catch (e) {
-      return {'success': false, 'message': 'Connection error'};
+      final message = e.toString();
+      debugPrint('Verify code error: $message');
+      return {
+        'success': false,
+        'message': message.contains('timeout')
+            ? 'Connection timeout - Backend not responding at $baseUrl'
+            : 'Connection error: $message',
+      };
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -143,6 +197,14 @@ class AuthService extends ChangeNotifier {
     _user = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    notifyListeners();
+  }
+
+  /// Update locally stored user object (and persist to prefs)
+  Future<void> updateLocalUser(Map<String, dynamic> user) async {
+    _user = user;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user', jsonEncode(_user));
     notifyListeners();
   }
 }

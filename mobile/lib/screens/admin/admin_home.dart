@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../login_screen.dart';
+import '../account_screen.dart';
 import 'admin_buses_screen.dart';
 import 'admin_requests_screen.dart';
 import 'admin_drivers_screen.dart';
 import 'admin_routes_screen.dart';
+import 'admin_users_screen.dart';
 import 'admin_settings_screen.dart';
 import '../shared/notices_screen.dart';
 
@@ -34,6 +36,7 @@ class _AdminHomeState extends State<AdminHome> {
       const AdminBusesScreen(),
       const AdminRequestsScreen(),
       const AdminDriversScreen(),
+      const AdminUsersScreen(),
       const NoticesScreen(adminMode: true),
       const AdminSettingsScreen(),
     ];
@@ -66,6 +69,7 @@ class _AdminHomeState extends State<AdminHome> {
             BottomNavigationBarItem(icon: Icon(Icons.directions_bus_rounded), label: 'Buses'),
             BottomNavigationBarItem(icon: Icon(Icons.assignment_rounded), label: 'Requests'),
             BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Drivers'),
+            BottomNavigationBarItem(icon: Icon(Icons.group_rounded), label: 'Users'),
             BottomNavigationBarItem(icon: Icon(Icons.campaign_rounded), label: 'Notices'),
             BottomNavigationBarItem(icon: Icon(Icons.account_tree_rounded), label: 'Departments'),
           ],
@@ -213,29 +217,35 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     ),
                     GestureDetector(
                       onTap: () async {
-                        final confirm = await showDialog<bool>(
+                        final choice = await showModalBottomSheet<String>(
                           context: context,
-                          builder: (_) => AlertDialog(
-                            backgroundColor: const Color(0xFF16213E),
-                            title: const Text('Sign Out',
-                                style: TextStyle(color: Colors.white)),
-                            content: const Text('Sign out of admin panel?',
-                                style: TextStyle(color: Color(0xFF8892A4))),
-                            actions: [
-                              TextButton(
-                                  onPressed: () => Navigator.pop(context, false),
-                                  child: const Text('Cancel')),
-                              TextButton(
-                                  onPressed: () => Navigator.pop(context, true),
-                                  child: const Text('Sign Out',
-                                      style: TextStyle(color: Colors.red))),
-                            ],
-                          ),
+                          backgroundColor: const Color(0xFF16213E),
+                          builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            ListTile(leading: const Icon(Icons.person), title: const Text('My Account'), onTap: () => Navigator.pop(context, 'account')),
+                            ListTile(leading: const Icon(Icons.logout), title: const Text('Sign Out'), onTap: () => Navigator.pop(context, 'logout')),
+                          ])),
                         );
-                        if (confirm == true && context.mounted) {
-                          await context.read<AuthService>().logout();
-                          Navigator.pushReplacement(context,
-                              MaterialPageRoute(builder: (_) => const LoginScreen()));
+                        if (choice == 'account' && context.mounted) {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountScreen()));
+                          return;
+                        }
+                        if (choice == 'logout') {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              backgroundColor: const Color(0xFF16213E),
+                              title: const Text('Sign Out', style: TextStyle(color: Colors.white)),
+                              content: const Text('Sign out of admin panel?', style: TextStyle(color: Color(0xFF8892A4))),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                                TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Sign Out', style: TextStyle(color: Colors.red))),
+                              ],
+                            ),
+                          );
+                          if (confirm == true && context.mounted) {
+                            await context.read<AuthService>().logout();
+                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                          }
                         }
                       },
                       child: Container(
