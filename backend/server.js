@@ -91,7 +91,13 @@ io.on('connection', (socket) => {
     },
   }, { new: true }).catch(() => null);
   if (!bus) return;
-  const trip = { busId: data.busId, tripId: data.tripId, routeId: bus.routeId?.toString(), startedAt: bus.tripStartedAt };
+  const trip = {
+    busId: data.busId,
+    tripId: data.tripId,
+    routeId: bus.routeId?.toString(),
+    startedAt: bus.tripStartedAt,
+    currentLocation: activeBuses[data.busId] || null,
+  };
   activeTrips[data.busId] = trip;
   io.emit('trip:started', trip);
 });

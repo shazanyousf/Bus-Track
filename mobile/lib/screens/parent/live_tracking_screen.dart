@@ -28,6 +28,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   String _lastUpdate = 'Waiting for signal...';
   bool _connected = false;
   bool _tripCompleted = false;
+  bool _tripStartedBySocket = false;
   String? _tripId;
   Map<String, dynamic>? _lastAlert;
 
@@ -106,7 +107,16 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
 
     _socket.listenToTripStarted((data) {
       if (data['busId']?.toString() != busId || !mounted) return;
-      _startListening();
+      final tripId = data['tripId']?.toString();
+      if (tripId == null || tripId.isEmpty) return;
+      setState(() {
+        _tripId = tripId;
+        _tripStartedBySocket = true;
+        _tripCompleted = false;
+        _connected = true;
+        _speed = 0;
+        _lastUpdate = 'Waiting for signal...';
+      });
     });
 
     _socket.listenToBusAlerts(busId, (alert) {
@@ -164,18 +174,21 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       if (!mounted) return;
       setState(() {
         _tripId = activeTrip['tripId']?.toString();
+        _tripStartedBySocket = false;
         _tripCompleted = false;
         _lastUpdate = 'Waiting for signal...';
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _tripId = null;
-        _tripCompleted = true;
-        _connected = false;
-        _speed = 0;
-        _lastUpdate = 'Location unavailable';
-      });
+      if (!_tripStartedBySocket) {
+        setState(() {
+          _tripId = null;
+          _tripCompleted = true;
+          _connected = false;
+          _speed = 0;
+          _lastUpdate = 'Location unavailable';
+        });
+      }
     }
     _socket.requestBusLocation(busId);
     _socket.listenToTripCompleted((data) {
@@ -183,6 +196,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       if (!mounted) return;
       setState(() {
         _tripCompleted = true;
+        _tripStartedBySocket = false;
         _tripId = null;
         _connected = false;
         _speed = 0;
