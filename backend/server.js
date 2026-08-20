@@ -75,22 +75,25 @@ io.on('connection', (socket) => {
   }
 
   const driverCanUseBus = async (busId) => {
-    if (socket.user?.role !== 'driver') return false;
-    const user = await User.findOne({ _id: socket.user.id, role: 'driver' }).select('_id busId phone').lean().catch(() => null);
-    if (!user) return false;
-    if (user.busId?.toString() === busId.toString()) return true;
-    if (!user.phone) return false;
+    if (socket.user?.role !== 'driver') return { ok: false, reason: 'socket is not an authenticated driver' };
+    const user = await User.findOne({ _id: socket.user.id, role: 'driver' }).select('_id phone').lean().catch(() => null);
+    if (!user) return { ok: false, reason: 'driver user was not found' };
+    if (!user.phone) return { ok: false, reason: 'driver user has no phone for Driver lookup' };
     const bus = await Bus.findById(busId).select('driverId').lean().catch(() => null);
-    if (!bus?.driverId) return false;
+    if (!bus?.driverId) return { ok: false, reason: 'bus has no assigned driverId' };
     const driver = await Driver.findOne({ _id: bus.driverId, phone: user.phone }).select('_id').lean().catch(() => null);
-    return Boolean(driver);
+    return driver
+      ? { ok: true }
+      : { ok: false, reason: 'Bus.driverId does not match the authenticated driver phone' };
   };
 
   // Driver sends their GPS location
   // Payload: { busId, latitude, longitude, speed }
  socket.on('driver:trip:start', async (data) => {
-  if (!data.busId || !data.tripId) return;
-  if (!(await driverCanUseBus(data.busId))) return;
+  console.log('TRIP START REQUEST', { driverId: socket.user?.id || 'anonymous', busId: data.busId, tripId: data.tripId });
+  if (!data.busId || !data.tripId) return console.log('TRIP START REJECTED: busId and tripId are required');
+  const authorization = await driverCanUseBus(data.busId);
+  if (!authorization.ok) return console.log(`TRIP START REJECTED: ${authorization.reason}`);
   const bus = await Bus.findOneAndUpdate({
     _id: data.busId,
     tripStatus: { $ne: 'ACTIVE' },
@@ -101,7 +104,7 @@ io.on('connection', (socket) => {
       tripStartedAt: new Date(), tripCompletedAt: null,
     },
   }, { new: true }).catch(() => null);
-  if (!bus) return;
+  if (!bus) return console.log('TRIP START REJECTED: bus is already active or trip state changed');
   const trip = {
     busId: data.busId,
     tripId: data.tripId,
@@ -114,44 +117,59 @@ io.on('connection', (socket) => {
 });
 
  socket.on('driver:trip:complete', async (data) => {
-  if (!data.busId || !data.tripId) return;
-  if (!(await driverCanUseBus(data.busId))) return;
+  console.log('TRIP COMPLETE REQUEST', { driverId: socket.user?.id || 'anonymous', busId: data.busId, tripId: data.tripId });
+  if (!data.busId || !data.tripId) return console.log('TRIP COMPLETE REJECTED: busId and tripId are required');
+  const authorization = await driverCanUseBus(data.busId);
+  if (!authorization.ok) return console.log(`TRIP COMPLETE REJECTED: ${authorization.reason}`);
   const bus = await Bus.findOneAndUpdate(
     { _id: data.busId, tripId: data.tripId, tripStatus: 'ACTIVE' },
     { $set: { tripStatus: 'COMPLETED', trackingStatus: 'OFFLINE', tripCompletedAt: new Date() } },
     { new: true },
   ).catch(() => null);
-  if (!bus) return;
+  if (!bus) return console.log('TRIP COMPLETE REJECTED: trip does not match active bus');
   delete activeTrips[data.busId];
   delete activeBuses[data.busId];
   io.emit('trip:completed', { busId: data.busId, tripId: data.tripId, completedAt: bus.tripCompletedAt });
 });
 
  socket.on('driver:location', async (data) => {
-  if (!data.busId || !data.tripId) return;
-  if (!(await driverCanUseBus(data.busId))) return;
-  const trip = activeTrips[data.busId];
-  if (!trip || trip.tripId !== data.tripId) return;
+  const lat = Number(data.latitude ?? data.lat);
+  const lng = Number(data.longitude ?? data.lng);
+  console.log('LOCATION RECEIVED', { driverId: socket.user?.id || 'anonymous', busId: data.busId, tripId: data.tripId, lat, lng });
+  if (!data.busId || !data.tripId) return console.log('LOCATION REJECTED: busId and tripId are required');
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return console.log('LOCATION REJECTED: latitude/longitude are invalid');
+  const authorization = await driverCanUseBus(data.busId);
+  if (!authorization.ok) return console.log(`LOCATION REJECTED: ${authorization.reason}`);
   const bus = await Bus.findOne({ _id: data.busId, tripId: data.tripId, tripStatus: 'ACTIVE', trackingStatus: 'LIVE' }).select('_id').lean();
-  if (!bus) return;
+  if (!bus) return console.log('LOCATION REJECTED: bus trip is not ACTIVE/LIVE or tripId does not match');
+
+  const trip = activeTrips[data.busId] || {
+    busId: data.busId,
+    tripId: data.tripId,
+  };
+  if (trip.tripId !== data.tripId) return console.log('LOCATION REJECTED: in-memory tripId does not match');
 
   const formattedData = {
     busId: data.busId,
     tripId: data.tripId,
-    lat: data.latitude ?? data.lat,
-    lng: data.longitude ?? data.lng,
-    latitude: data.latitude ?? data.lat,
-    longitude: data.longitude ?? data.lng,
+    lat,
+    lng,
+    latitude: lat,
+    longitude: lng,
     speed: data.speed,
     timestamp: new Date().toISOString(),
   };
 
   activeBuses[data.busId] = formattedData;
+  activeTrips[data.busId] = trip;
+  await Bus.updateOne({ _id: data.busId }, { $set: { 'currentLocation.latitude': lat, 'currentLocation.longitude': lng } }).catch((error) => {
+    console.log(`LOCATION PERSIST FAILED: ${error.message}`);
+  });
 
   io.emit(`bus:location:${data.busId}`, formattedData);
   io.emit('trip:location', formattedData);
 
-  console.log(`🚌 Bus ${data.busId} → lat:${data.lat?.toFixed(4)} lng:${data.lng?.toFixed(4)} speed:${data.speed?.toFixed(0)}km/h`);
+  console.log('LOCATION BROADCAST', { busId: data.busId, tripId: data.tripId, lat, lng });
 });
 
   // Client can request last known position on connect
@@ -221,14 +239,28 @@ async function reconcileBusSeats() {
 }
 
 async function hydrateActiveTrips() {
-  const buses = await Bus.find({ tripStatus: 'ACTIVE', trackingStatus: 'LIVE' }).select('_id tripId routeId tripStartedAt').lean();
+  const buses = await Bus.find({ tripStatus: 'ACTIVE', trackingStatus: 'LIVE' }).select('_id tripId routeId tripStartedAt currentLocation').lean();
   buses.forEach((bus) => {
-    activeTrips[bus._id.toString()] = {
-      busId: bus._id.toString(),
+    const busId = bus._id.toString();
+    activeTrips[busId] = {
+      busId,
       tripId: bus.tripId,
       routeId: bus.routeId?.toString(),
       startedAt: bus.tripStartedAt,
     };
+    const latitude = Number(bus.currentLocation?.latitude);
+    const longitude = Number(bus.currentLocation?.longitude);
+    if (Number.isFinite(latitude) && Number.isFinite(longitude) && (latitude !== 0 || longitude !== 0)) {
+      activeBuses[busId] = {
+        busId,
+        tripId: bus.tripId,
+        latitude,
+        longitude,
+        lat: latitude,
+        lng: longitude,
+        timestamp: bus.updatedAt?.toISOString() || new Date().toISOString(),
+      };
+    }
   });
   console.log(`🚍 Restored ${buses.length} active trip(s)`);
 }

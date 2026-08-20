@@ -2,6 +2,19 @@ const router = require('express').Router();
 const Bus = require('../models/Bus');
 const auth = require('../middleware/auth');
 
+const optionalAuth = (req, _res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (token) {
+    try {
+      const jwt = require('jsonwebtoken');
+      req.user = jwt.verify(token, process.env.JWT_SECRET || 'bustrack_secret');
+    } catch (_) {
+      req.user = null;
+    }
+  }
+  next();
+};
+
 router.get('/active-trips', auth, async (req, res) => {
   try {
     const buses = await Bus.find({ tripStatus: 'ACTIVE', trackingStatus: 'LIVE' })
@@ -28,11 +41,21 @@ router.get('/:id/active-trip', auth, async (req, res) => {
 });
 
 // Get all buses (optionally filter by route)
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
     const filter = req.query.routeId ? { routeId: req.query.routeId } : {};
     const buses = await Bus.find(filter).populate('driverId').populate('routeId');
-    console.log(`BUS LIST: returning ${buses.length} buses`);
+    console.log('BUS LIST REQUEST', {
+      userId: req.user?.id || 'anonymous',
+      role: req.user?.role || 'anonymous',
+      routeId: req.query.routeId || 'all',
+    });
+    console.log(`BUS LIST: returning ${buses.length} buses`, buses.map((bus) => ({
+      id: bus._id.toString(),
+      busNumber: bus.busNumber,
+      tripStatus: bus.tripStatus,
+      trackingStatus: bus.trackingStatus,
+    })));
     res.json(buses);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });

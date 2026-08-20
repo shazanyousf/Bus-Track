@@ -53,7 +53,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   @override
   void initState() {
     super.initState();
-    _socket.connect();
+    _socket.connect(token: context.read<AuthService>().token);
     _buildInitialMarkers();
     _startListening();
   }
@@ -223,7 +223,6 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     final busId = widget.bus['_id'] as String? ?? 'BUS001';
     _socket.stopListening(busId);
     _socket.stopListeningAlerts(busId);
-    _socket.stopListeningToTripEvents();
     super.dispose();
   }
 

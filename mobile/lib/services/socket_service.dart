@@ -70,6 +70,14 @@ class SocketService {
     _socket!.onError((e) => print('Socket error: $e'));
   }
 
+  Future<bool> waitForConnection({Duration timeout = const Duration(seconds: 10)}) async {
+    final deadline = DateTime.now().add(timeout);
+    while (!(_socket?.connected ?? false) && DateTime.now().isBefore(deadline)) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    return _socket?.connected ?? false;
+  }
+
   /// Driver calls this to broadcast their GPS location.
   void emitLocation({
     required String busId,
@@ -78,7 +86,12 @@ class SocketService {
     required double longitude,
     required double speed,
   }) {
-    _socket?.emit('driver:location', {
+    if (!(_socket?.connected ?? false)) {
+      print('DRIVER LOCATION SKIPPED: socket is not connected');
+      return;
+    }
+    print('DRIVER -> SOCKET LOCATION busId=$busId tripId=$tripId lat=$latitude lng=$longitude');
+    _socket!.emit('driver:location', {
       'busId': busId,
       'tripId': tripId,
       'latitude': latitude,
@@ -91,6 +104,10 @@ class SocketService {
   }
 
   void emitTripStarted({required String busId, required String tripId}) {
+    if (!(_socket?.connected ?? false)) {
+      print('TRIP START SKIPPED: socket is not connected');
+      return;
+    }
     _socket?.emit('driver:trip:start', {'busId': busId, 'tripId': tripId});
   }
 
@@ -195,7 +212,6 @@ class SocketService {
   /// Stop listening to a bus (call when leaving the tracking screen).
   void stopListening(String busId) {
     _socket?.off('bus:location:$busId');
-    _socket?.off('trip:location');
   }
 
   void stopListeningAlerts(String busId) {

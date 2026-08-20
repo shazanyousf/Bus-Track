@@ -53,7 +53,14 @@ class ApiService {
   static Future<List> getBuses({String? routeId}) async {
     final query = routeId != null ? '?routeId=$routeId' : '';
     final res = await http.get(Uri.parse('$baseUrl/buses$query')).timeout(_timeout);
-    if (res.statusCode == 200) return jsonDecode(res.body);
+    if (res.statusCode == 200) {
+      final buses = jsonDecode(res.body) as List;
+      debugPrint('BUS LIST RESPONSE: status=${res.statusCode} count=${buses.length}');
+      for (final bus in buses) {
+        debugPrint('BUS LIST ITEM: id=${bus['_id']} bus=${bus['busNumber']}');
+      }
+      return buses;
+    }
     throw Exception('Failed to load buses');
   }
 

@@ -106,8 +106,28 @@ class _DriverHomeState extends State<DriverHome> {
     final hasPermission = await _checkPermission();
     if (!hasPermission) return;
 
+    final busId = _selectedBus!['_id']?.toString();
+    if (busId == null || busId.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Selected bus has no valid database ID'),
+          backgroundColor: Colors.red,
+        ));
+      }
+      return;
+    }
+    final connected = await _socket.waitForConnection();
+    if (!connected) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Tracking server is not connected'),
+          backgroundColor: Colors.red,
+        ));
+      }
+      return;
+    }
+
     setState(() => _isTracking = true);
-    final busId = _selectedBus!['_id'] as String? ?? _selectedBus!['busNumber'] as String? ?? 'BUS001';
     _tripId = 'trip-${busId}-${DateTime.now().millisecondsSinceEpoch}';
     _socket.emitTripStarted(busId: busId, tripId: _tripId!);
 
