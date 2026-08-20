@@ -15,20 +15,20 @@ let package = Package(
         .library(name: "FlutterGeneratedPluginSwiftPackage", type: .static, targets: ["FlutterGeneratedPluginSwiftPackage"])
     ],
     dependencies: [
-        .package(name: "url_launcher_ios", path: "../.packages/url_launcher_ios-6.4.1"),
-        .package(name: "shared_preferences_foundation", path: "../.packages/shared_preferences_foundation-2.5.6"),
-        .package(name: "geolocator_apple", path: "../.packages/geolocator_apple-2.3.13"),
         .package(name: "file_picker", path: "../.packages/file_picker-8.3.7"),
+        .package(name: "geolocator_apple", path: "../.packages/geolocator_apple-2.3.13"),
+        .package(name: "shared_preferences_foundation", path: "../.packages/shared_preferences_foundation-2.5.6"),
+        .package(name: "url_launcher_ios", path: "../.packages/url_launcher_ios-6.4.1"),
         .package(name: "FlutterFramework", path: "../.packages/FlutterFramework")
     ],
     targets: [
         .target(
             name: "FlutterGeneratedPluginSwiftPackage",
             dependencies: [
-                .product(name: "url-launcher-ios", package: "url_launcher_ios"),
-                .product(name: "shared-preferences-foundation", package: "shared_preferences_foundation"),
-                .product(name: "geolocator-apple", package: "geolocator_apple"),
                 .product(name: "file-picker", package: "file_picker"),
+                .product(name: "geolocator-apple", package: "geolocator_apple"),
+                .product(name: "shared-preferences-foundation", package: "shared_preferences_foundation"),
+                .product(name: "url-launcher-ios", package: "url_launcher_ios"),
                 .product(name: "FlutterFramework", package: "FlutterFramework")
             ]
         )

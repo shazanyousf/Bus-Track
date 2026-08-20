@@ -15,7 +15,8 @@
     <application
         android:label="BusTrack"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
 
         <!-- Google Maps API Key — replace YOUR_GOOGLE_MAPS_API_KEY below -->
         <meta-data

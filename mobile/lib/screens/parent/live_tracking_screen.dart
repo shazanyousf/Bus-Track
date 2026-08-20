@@ -190,11 +190,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
               ),
               children: [
                 TileLayer(
-                  // Use a direct OSM endpoint + explicit network provider for
-                  // better compatibility on Android emulators.
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'dev.bustrack.mobile',
-                  tileProvider: NetworkTileProvider(),
+                  urlTemplate: 'https://a.tile.openstreetmap.de/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.bustrack',
+                  tileProvider: NetworkTileProvider(
+                    headers: {'User-Agent': 'com.example.bustrack'},
+                  ),
                 ),
                 if (_polylines.isNotEmpty) PolylineLayer(polylines: _polylines),
                 MarkerLayer(markers: _markers),

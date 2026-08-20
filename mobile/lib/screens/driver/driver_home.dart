@@ -289,11 +289,11 @@ class _DriverHomeState extends State<DriverHome> {
               children: [
                 // Visible debug background to confirm map area
                 TileLayer(
-                  // Use a direct OSM endpoint + explicit network provider for
-                  // better compatibility on Android emulators.
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'dev.bustrack.mobile',
-                  tileProvider: NetworkTileProvider(),
+                  urlTemplate: 'https://a.tile.openstreetmap.de/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.bustrack',
+                  tileProvider: NetworkTileProvider(
+                    headers: {'User-Agent': 'com.example.bustrack'},
+                  ),
                 ),
                 if (_polylines.isNotEmpty) PolylineLayer(polylines: _polylines),
                 MarkerLayer(markers: _markers),
@@ -597,10 +597,11 @@ class _DriverHomeState extends State<DriverHome> {
             ),
             children: [
               TileLayer(
-                urlTemplate:
-                    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                subdomains: const ['a', 'b', 'c'],
+                urlTemplate: 'https://a.tile.openstreetmap.de/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.bustrack',
+                tileProvider: NetworkTileProvider(
+                  headers: {'User-Agent': 'com.example.bustrack'},
+                ),
               ),
               if (_polylines.isNotEmpty) PolylineLayer(polylines: _polylines),
               MarkerLayer(markers: _markers),
