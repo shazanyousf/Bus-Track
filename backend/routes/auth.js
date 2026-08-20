@@ -208,16 +208,21 @@ router.post('/forgot-password', async (req, res) => {
     const resetCodeExpiry = new Date(Date.now() + 10 * 60000); // 10 minutes
     await User.findByIdAndUpdate(user._id, { resetCode, resetCodeExpiry });
 
-    const emailSent = await _sendEmail({
-      to: user.email,
-      subject: 'BusTrack Password Reset Code',
-      text: `Your BusTrack password reset code is ${resetCode}. It expires in 10 minutes.`,
-      html: `<p>Your BusTrack password reset code is <strong>${resetCode}</strong>.</p><p>This code expires in 10 minutes.</p>`,
-    }).catch(() => false);
+    let emailSent = false;
+    try {
+      emailSent = await _sendEmail({
+        to: user.email,
+        subject: 'BusTrack Password Reset Code',
+        text: `Your BusTrack password reset code is ${resetCode}. It expires in 10 minutes.`,
+        html: `<p>Your BusTrack password reset code is <strong>${resetCode}</strong>.</p><p>This code expires in 10 minutes.</p>`,
+      });
+    } catch (emailError) {
+      console.error('Password reset email failed:', emailError.message);
+    }
 
     const message = emailSent
       ? 'Reset code sent to your registered email address.'
-      : 'Reset code generated. Email sending is not configured on the server.';
+      : 'Reset code generated, but the email could not be sent. Check the Resend sender configuration.';
 
     const response = { message };
     if (!emailSent && process.env.NODE_ENV !== 'production' && process.env.SHOW_RESET_CODE === 'true') {
