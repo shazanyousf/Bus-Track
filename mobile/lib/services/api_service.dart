@@ -190,6 +190,13 @@ class ApiService {
     throw Exception('Failed to load registrations');
   }
 
+  static Future<Map<String, dynamic>> getAdminDashboardStats(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/admin/dashboard/stats'),
+        headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return Map<String, dynamic>.from(jsonDecode(res.body));
+    throw Exception('Failed to load dashboard statistics');
+  }
+
   static Future<Uint8List> downloadRegistrationReport(String token) async {
     final res = await http.get(Uri.parse('$baseUrl/reports/registrations.xlsx'),
         headers: headers(token)).timeout(_timeout);
@@ -202,6 +209,20 @@ class ApiService {
         headers: headers(token)).timeout(_timeout);
     if (res.statusCode == 200) return res.bodyBytes;
     throw Exception('Failed to download registration report');
+  }
+
+  static Future<Uint8List> downloadPaymentReport(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/reports/payments.xlsx'),
+        headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return res.bodyBytes;
+    throw Exception('Failed to download payment report');
+  }
+
+  static Future<Uint8List> downloadPaymentReportCsv(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/reports/payments.csv'),
+        headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return res.bodyBytes;
+    throw Exception('Failed to download payment report');
   }
 
   static Future<Map> submitRegistration(String token, Map data) async {

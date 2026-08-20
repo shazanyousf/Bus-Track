@@ -41,6 +41,7 @@ app.use('/api/settings',      require('./routes/settings'));
 app.use('/api/students',      require('./routes/students'));
 app.use('/api/notices',       require('./routes/notices'));
 app.use('/api/users',         require('./routes/users'));
+app.use('/api/admin',         require('./routes/admin'));
 app.use('/api/reports',       require('./routes/reports'));
 
 app.get('/api', (req, res) =>
@@ -55,6 +56,7 @@ app.get('/', (req, res) =>
 
 // ── Socket.io — Real-Time GPS Tracking ──────────────────────────────────────
 const activeBuses = {}; // { busId: { latitude, longitude, speed, timestamp } }
+app.set('activeBuses', activeBuses);
 
 io.on('connection', (socket) => {
   console.log(`📱 Client connected: ${socket.id}`);

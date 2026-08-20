@@ -12,6 +12,7 @@ import 'admin_drivers_screen.dart';
 import 'admin_routes_screen.dart';
 import 'admin_users_screen.dart';
 import '../shared/notices_screen.dart';
+import 'admin_dashboard.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
@@ -26,7 +27,7 @@ class _AdminHomeState extends State<AdminHome> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      _AdminDashboard(
+      AdminDashboard(
         onOpenBuses: () => setState(() => _currentIndex = 2),
         onOpenRequests: () => setState(() => _currentIndex = 3),
         onOpenDrivers: () => setState(() => _currentIndex = 4),
@@ -78,6 +79,33 @@ class _AdminHomeState extends State<AdminHome> {
   }
 
   Future<void> _downloadReports() async {
+    final reportType = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF16213E),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Download Reports', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              subtitle: const Text('Choose a report', style: TextStyle(color: Color(0xFF8892A4))),
+            ),
+            ListTile(
+              leading: const Icon(Icons.assignment_rounded, color: Color(0xFF4A9EFF)),
+              title: const Text('Registration Report', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context, 'registration'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.payments_rounded, color: Color(0xFF2ECC71)),
+              title: const Text('Payment Report', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context, 'payment'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (reportType == null || !mounted) return;
+
     final format = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF16213E),
@@ -85,9 +113,9 @@ class _AdminHomeState extends State<AdminHome> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const ListTile(
-              title: Text('Download Reports', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-              subtitle: Text('Choose a file format', style: TextStyle(color: Color(0xFF8892A4))),
+            ListTile(
+              title: Text('${reportType == 'payment' ? 'Payment' : 'Registration'} Report', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              subtitle: const Text('Choose a file format', style: TextStyle(color: Color(0xFF8892A4))),
             ),
             ListTile(
               leading: const Icon(Icons.table_chart_rounded, color: Color(0xFF2ECC71)),
@@ -110,16 +138,17 @@ class _AdminHomeState extends State<AdminHome> {
       final token = context.read<AuthService>().token;
       if (token == null) throw Exception('You are not signed in');
       final isExcel = format == 'xlsx';
-      final bytes = isExcel
-          ? await ApiService.downloadRegistrationReport(token)
-          : await ApiService.downloadRegistrationReportCsv(token);
+      final isPayment = reportType == 'payment';
+      final bytes = isPayment
+          ? (isExcel ? await ApiService.downloadPaymentReport(token) : await ApiService.downloadPaymentReportCsv(token))
+          : (isExcel ? await ApiService.downloadRegistrationReport(token) : await ApiService.downloadRegistrationReportCsv(token));
       final path = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save ${isExcel ? 'Excel' : 'CSV'} registration report',
-        fileName: 'bustrack-registrations.${isExcel ? 'xlsx' : 'csv'}',
+        dialogTitle: 'Save ${isExcel ? 'Excel' : 'CSV'} ${isPayment ? 'payment' : 'registration'} report',
+        fileName: 'bustrack-${isPayment ? 'payments' : 'registrations'}.${isExcel ? 'xlsx' : 'csv'}',
         bytes: bytes,
       );
       if (path != null && mounted) {
-        messenger.showSnackBar(SnackBar(content: Text('${isExcel ? 'Excel' : 'CSV'} report downloaded successfully')));
+        messenger.showSnackBar(SnackBar(content: Text('${isExcel ? 'Excel' : 'CSV'} ${isPayment ? 'payment' : 'registration'} report downloaded successfully')));
       }
     } catch (error) {
       if (mounted) {
