@@ -81,6 +81,8 @@ class SocketService {
     _socket?.emit('driver:location', {
       'busId': busId,
       'tripId': tripId,
+      'latitude': latitude,
+      'longitude': longitude,
       'lat': latitude,
       'lng': longitude,
       'speed': speed,
@@ -117,6 +119,11 @@ class SocketService {
   void listenToBus(String busId, void Function(Map<String, dynamic>) onData) {
     _socket?.on('bus:location:$busId', (data) {
       if (data is Map) {
+        onData(Map<String, dynamic>.from(data));
+      }
+    });
+    _socket?.on('trip:location', (data) {
+      if (data is Map && data['busId']?.toString() == busId) {
         onData(Map<String, dynamic>.from(data));
       }
     });
@@ -188,6 +195,7 @@ class SocketService {
   /// Stop listening to a bus (call when leaving the tracking screen).
   void stopListening(String busId) {
     _socket?.off('bus:location:$busId');
+    _socket?.off('trip:location');
   }
 
   void stopListeningAlerts(String busId) {

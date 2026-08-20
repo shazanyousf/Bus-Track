@@ -6,6 +6,7 @@ const path       = require('path');
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const Bus = require('./models/Bus');
+const Driver = require('./models/Driver');
 const Registration = require('./models/Registration');
 const User = require('./models/User');
 require('dotenv').config();
@@ -73,13 +74,23 @@ io.on('connection', (socket) => {
     }
   }
 
+  const driverCanUseBus = async (busId) => {
+    if (socket.user?.role !== 'driver') return false;
+    const user = await User.findOne({ _id: socket.user.id, role: 'driver' }).select('_id busId phone').lean().catch(() => null);
+    if (!user) return false;
+    if (user.busId?.toString() === busId.toString()) return true;
+    if (!user.phone) return false;
+    const bus = await Bus.findById(busId).select('driverId').lean().catch(() => null);
+    if (!bus?.driverId) return false;
+    const driver = await Driver.findOne({ _id: bus.driverId, phone: user.phone }).select('_id').lean().catch(() => null);
+    return Boolean(driver);
+  };
+
   // Driver sends their GPS location
   // Payload: { busId, latitude, longitude, speed }
  socket.on('driver:trip:start', async (data) => {
   if (!data.busId || !data.tripId) return;
-  if (socket.user?.role !== 'driver') return;
-  const driver = await User.findOne({ _id: socket.user.id, role: 'driver', busId: data.busId }).select('_id').lean().catch(() => null);
-  if (!driver) return;
+  if (!(await driverCanUseBus(data.busId))) return;
   const bus = await Bus.findOneAndUpdate({
     _id: data.busId,
     tripStatus: { $ne: 'ACTIVE' },
@@ -104,9 +115,7 @@ io.on('connection', (socket) => {
 
  socket.on('driver:trip:complete', async (data) => {
   if (!data.busId || !data.tripId) return;
-  if (socket.user?.role !== 'driver') return;
-  const driver = await User.findOne({ _id: socket.user.id, role: 'driver', busId: data.busId }).select('_id').lean().catch(() => null);
-  if (!driver) return;
+  if (!(await driverCanUseBus(data.busId))) return;
   const bus = await Bus.findOneAndUpdate(
     { _id: data.busId, tripId: data.tripId, tripStatus: 'ACTIVE' },
     { $set: { tripStatus: 'COMPLETED', trackingStatus: 'OFFLINE', tripCompletedAt: new Date() } },
@@ -120,9 +129,7 @@ io.on('connection', (socket) => {
 
  socket.on('driver:location', async (data) => {
   if (!data.busId || !data.tripId) return;
-  if (socket.user?.role !== 'driver') return;
-  const driver = await User.findOne({ _id: socket.user.id, role: 'driver', busId: data.busId }).select('_id').lean().catch(() => null);
-  if (!driver) return;
+  if (!(await driverCanUseBus(data.busId))) return;
   const trip = activeTrips[data.busId];
   if (!trip || trip.tripId !== data.tripId) return;
   const bus = await Bus.findOne({ _id: data.busId, tripId: data.tripId, tripStatus: 'ACTIVE', trackingStatus: 'LIVE' }).select('_id').lean();
@@ -131,8 +138,10 @@ io.on('connection', (socket) => {
   const formattedData = {
     busId: data.busId,
     tripId: data.tripId,
-    lat: data.lat,
-    lng: data.lng,
+    lat: data.latitude ?? data.lat,
+    lng: data.longitude ?? data.lng,
+    latitude: data.latitude ?? data.lat,
+    longitude: data.longitude ?? data.lng,
     speed: data.speed,
     timestamp: new Date().toISOString(),
   };
@@ -140,6 +149,7 @@ io.on('connection', (socket) => {
   activeBuses[data.busId] = formattedData;
 
   io.emit(`bus:location:${data.busId}`, formattedData);
+  io.emit('trip:location', formattedData);
 
   console.log(`🚌 Bus ${data.busId} → lat:${data.lat?.toFixed(4)} lng:${data.lng?.toFixed(4)} speed:${data.speed?.toFixed(0)}km/h`);
 });

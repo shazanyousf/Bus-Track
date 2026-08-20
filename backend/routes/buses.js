@@ -32,6 +32,7 @@ router.get('/', async (req, res) => {
   try {
     const filter = req.query.routeId ? { routeId: req.query.routeId } : {};
     const buses = await Bus.find(filter).populate('driverId').populate('routeId');
+    console.log(`BUS LIST: returning ${buses.length} buses`);
     res.json(buses);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
