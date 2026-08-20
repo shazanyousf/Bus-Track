@@ -57,6 +57,18 @@ class ApiService {
     throw Exception('Failed to load buses');
   }
 
+  static Future<Map> getActiveTrip(String busId, String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/buses/$busId/active-trip'), headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('No active trip');
+  }
+
+  static Future<List> getActiveTrips(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/buses/active-trips'), headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to load active trips');
+  }
+
   static Future<Map> addBus(String token, Map data) async {
     final res = await http.post(Uri.parse('$baseUrl/buses'),
         headers: headers(token), body: jsonEncode(data)).timeout(_timeout);

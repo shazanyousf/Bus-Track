@@ -24,12 +24,13 @@ class _ParentHomeState extends State<ParentHome> {
     final SocketService _socket = SocketService();
   int _currentIndex = 0;
   List _registrations = [];
+  List _activeTrips = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    final parentId = context.read<AuthService>().user?['_id']?.toString();
+    final parentId = (context.read<AuthService>().user?['_id'] ?? context.read<AuthService>().user?['id'])?.toString();
     _socket.connect();
     _socket.listenToProfileUpdates((_) {
       if (mounted) _loadData();
@@ -46,6 +47,19 @@ class _ParentHomeState extends State<ParentHome> {
       );
       if (mounted) _loadData();
     });
+    _socket.listenToTripStarted((_) {
+      if (mounted) _loadData();
+    });
+    _socket.listenToTripCompleted((update) {
+      if (mounted) {
+        _loadData();
+        NotificationService.instance.show(
+          id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+          title: 'Trip completed',
+          body: 'The bus trip has ended. Live location is unavailable.',
+        );
+      }
+    });
     _loadData();
   }
 
@@ -53,6 +67,7 @@ class _ParentHomeState extends State<ParentHome> {
   void dispose() {
     _socket.stopListeningToProfileUpdates();
     _socket.stopListeningToRegistrationUpdates();
+    _socket.stopListeningToTripEvents();
     super.dispose();
   }
 
@@ -60,8 +75,15 @@ class _ParentHomeState extends State<ParentHome> {
     final auth = context.read<AuthService>();
     try {
       final regs = await ApiService.getRegistrations(auth.token!);
+      final trips = await ApiService.getActiveTrips(auth.token!);
+      final assignedBusIds = regs
+          .where((registration) => registration['status'] == 'active')
+          .map((registration) => registration['busId']?['_id']?.toString())
+          .whereType<String>()
+          .toSet();
       setState(() {
         _registrations = regs;
+        _activeTrips = trips.where((trip) => assignedBusIds.contains(trip['busId']?.toString())).toList();
         _loading = false;
       });
     } catch (_) {
@@ -78,6 +100,7 @@ class _ParentHomeState extends State<ParentHome> {
       _DashboardTab(
         userName: auth.user?['name'] ?? 'Parent',
         approved: approved,
+        activeTrips: _activeTrips,
         loading: _loading,
         onRefresh: _loadData,
         onRegister: () => setState(() => _currentIndex = 2),
@@ -134,6 +157,7 @@ class _ParentHomeState extends State<ParentHome> {
 class _DashboardTab extends StatelessWidget {
   final String userName;
   final List approved;
+  final List activeTrips;
   final bool loading;
   final VoidCallback onRefresh;
   final VoidCallback onRegister;
@@ -144,6 +168,7 @@ class _DashboardTab extends StatelessWidget {
   const _DashboardTab({
     required this.userName,
     required this.approved,
+    required this.activeTrips,
     required this.loading,
     required this.onRefresh,
     required this.onRegister,
@@ -243,6 +268,10 @@ class _DashboardTab extends StatelessWidget {
               const SizedBox(height: 18),
 
               // Assigned bus card
+              if (activeTrips.isNotEmpty) ...[
+                _ActiveTripBanner(trip: activeTrips.first),
+                const SizedBox(height: 18),
+              ],
               if (approved.isNotEmpty) ...[
                 const _SectionHeader(
                   title: 'Assigned Bus',
@@ -305,6 +334,42 @@ class _DashboardTab extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ActiveTripBanner extends StatelessWidget {
+  const _ActiveTripBanner({required this.trip});
+  final Map trip;
+
+  @override
+  Widget build(BuildContext context) {
+    final route = trip['route'] is Map ? trip['route'] as Map : {};
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF123A35),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2ECC71).withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.radar_rounded, color: Color(0xFF2ECC71), size: 25),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('TRIP IN PROGRESS', style: TextStyle(color: Color(0xFF75E3A2), fontSize: 11, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 3),
+                Text('Bus ${trip['busId'] ?? ''} is currently on trip', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                Text(route['routeName']?.toString() ?? 'Live location available', style: const TextStyle(color: Color(0xFFA7C8BD), fontSize: 11)),
+              ],
+            ),
+          ),
+          const Icon(Icons.circle, color: Color(0xFF2ECC71), size: 10),
+        ],
       ),
     );
   }

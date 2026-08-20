@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'parent/parent_home.dart';
 import 'admin/admin_home.dart';
+import 'driver/driver_home.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -28,12 +29,14 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigate() async {
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
     final auth = context.read<AuthService>();
     await auth.loadToken();
     if (!mounted) return;
-    if (auth.isLoggedIn) {
+    if (auth.isLoggedIn && auth.isDriver) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DriverHome()));
+    } else if (auth.isLoggedIn) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(

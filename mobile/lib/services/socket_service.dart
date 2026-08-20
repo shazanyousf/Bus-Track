@@ -51,13 +51,14 @@ class SocketService {
   }
 
   /// Call once when the app starts or the user logs in.
-  void connect() {
+  void connect({String? token}) {
     if (_socket != null && _socket!.connected) return;
 
     _socket = IO.io(
       socketUrl,
       IO.OptionBuilder()
           .setTransports(['websocket'])
+          .setAuth(token == null ? {} : {'token': token})
           .disableAutoConnect()
           .build(),
     );
@@ -72,17 +73,44 @@ class SocketService {
   /// Driver calls this to broadcast their GPS location.
   void emitLocation({
     required String busId,
+    required String tripId,
     required double latitude,
     required double longitude,
     required double speed,
   }) {
     _socket?.emit('driver:location', {
       'busId': busId,
+      'tripId': tripId,
       'lat': latitude,
       'lng': longitude,
       'speed': speed,
       'timestamp': DateTime.now().toIso8601String(),
     });
+  }
+
+  void emitTripStarted({required String busId, required String tripId}) {
+    _socket?.emit('driver:trip:start', {'busId': busId, 'tripId': tripId});
+  }
+
+  void emitTripCompleted({required String busId, required String tripId}) {
+    _socket?.emit('driver:trip:complete', {'busId': busId, 'tripId': tripId});
+  }
+
+  void listenToTripStarted(void Function(Map<String, dynamic>) onUpdate) {
+    _socket?.on('trip:started', (data) {
+      if (data is Map) onUpdate(Map<String, dynamic>.from(data));
+    });
+  }
+
+  void listenToTripCompleted(void Function(Map<String, dynamic>) onUpdate) {
+    _socket?.on('trip:completed', (data) {
+      if (data is Map) onUpdate(Map<String, dynamic>.from(data));
+    });
+  }
+
+  void stopListeningToTripEvents() {
+    _socket?.off('trip:started');
+    _socket?.off('trip:completed');
   }
 
   /// Parent calls this to listen to a specific bus.

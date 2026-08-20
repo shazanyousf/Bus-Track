@@ -28,6 +28,7 @@ class _DriverHomeState extends State<DriverHome> {
   List _buses = [];
   Map? _selectedBus;
   bool _isTracking = false;
+  String? _tripId;
   bool _loading = true;
   bool _sendingAlert = false;
   double _speed = 0;
@@ -44,7 +45,7 @@ class _DriverHomeState extends State<DriverHome> {
   @override
   void initState() {
     super.initState();
-    _socket.connect();
+    _socket.connect(token: context.read<AuthService>().token);
     _socket.listenToProfileUpdates((_) {
       if (mounted) _loadBuses();
     });
@@ -106,6 +107,9 @@ class _DriverHomeState extends State<DriverHome> {
     if (!hasPermission) return;
 
     setState(() => _isTracking = true);
+    final busId = _selectedBus!['_id'] as String? ?? _selectedBus!['busNumber'] as String? ?? 'BUS001';
+    _tripId = 'trip-${busId}-${DateTime.now().millisecondsSinceEpoch}';
+    _socket.emitTripStarted(busId: busId, tripId: _tripId!);
 
     // Start duration timer
     _duration = 0;
@@ -121,13 +125,13 @@ class _DriverHomeState extends State<DriverHome> {
       ),
     ).listen((Position pos) async {
       final newPos = LatLng(pos.latitude, pos.longitude);
-      final busId = _selectedBus!['_id'] as String? ??
-          _selectedBus!['busNumber'] as String? ??
-          'BUS001';
+        final currentTripId = _tripId;
+        if (currentTripId == null) return;
 
       // Emit to server → all parents watching this bus get updated
       _socket.emitLocation(
         busId: busId,
+        tripId: currentTripId,
         latitude: pos.latitude,
         longitude: pos.longitude,
         speed: pos.speed * 3.6, // m/s → km/h
@@ -157,6 +161,11 @@ class _DriverHomeState extends State<DriverHome> {
   }
 
   void _stopTracking() {
+    final busId = _selectedBus?['_id'] as String? ?? _selectedBus?['busNumber'] as String?;
+    final tripId = _tripId;
+    if (busId != null && tripId != null) {
+      _socket.emitTripCompleted(busId: busId, tripId: tripId);
+    }
     _socket.stopListeningToProfileUpdates();
     _posStream?.cancel();
     _posStream = null;
@@ -165,6 +174,7 @@ class _DriverHomeState extends State<DriverHome> {
     setState(() {
       _isTracking = false;
       _speed = 0;
+      _tripId = null;
     });
   }
 

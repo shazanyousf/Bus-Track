@@ -3,8 +3,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
 
 import '../../services/socket_service.dart';
+import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
 
 class LiveTrackingScreen extends StatefulWidget {
   final Map bus;
@@ -24,6 +27,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   double _speed = 0;
   String _lastUpdate = 'Waiting for signal...';
   bool _connected = false;
+  bool _tripCompleted = false;
+  String? _tripId;
   Map<String, dynamic>? _lastAlert;
 
   List<Marker> _markers = [];
@@ -94,10 +99,15 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     setState(() => _markers = markers);
   }
 
-  void _startListening() {
+  Future<void> _startListening() async {
     final busId = widget.bus['_id'] as String? ??
         widget.bus['busNumber'] as String? ??
         'BUS001';
+
+    _socket.listenToTripStarted((data) {
+      if (data['busId']?.toString() != busId || !mounted) return;
+      _startListening();
+    });
 
     _socket.listenToBusAlerts(busId, (alert) {
       if (!mounted) return;
@@ -114,6 +124,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     });
 
     _socket.listenToBus(busId, (data) {
+      if (_tripCompleted || _tripId == null || data['tripId']?.toString() != _tripId) return;
       final lat = (data['lat'] as num?)?.toDouble();
       final lng = (data['lng'] as num?)?.toDouble();
       final speed = (data['speed'] as num?)?.toDouble() ?? 0;
@@ -146,7 +157,38 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       });
     });
 
+    try {
+      final token = context.read<AuthService>().token;
+      if (token == null) throw Exception('Not authenticated');
+      final activeTrip = await ApiService.getActiveTrip(busId, token);
+      if (!mounted) return;
+      setState(() {
+        _tripId = activeTrip['tripId']?.toString();
+        _tripCompleted = false;
+        _lastUpdate = 'Waiting for signal...';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _tripId = null;
+        _tripCompleted = true;
+        _connected = false;
+        _speed = 0;
+        _lastUpdate = 'Location unavailable';
+      });
+    }
     _socket.requestBusLocation(busId);
+    _socket.listenToTripCompleted((data) {
+      if (data['busId']?.toString() != busId) return;
+      if (!mounted) return;
+      setState(() {
+        _tripCompleted = true;
+        _tripId = null;
+        _connected = false;
+        _speed = 0;
+        _lastUpdate = 'Trip completed';
+      });
+    });
   }
 
   String _formatTime(String? iso) {
@@ -167,6 +209,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     final busId = widget.bus['_id'] as String? ?? 'BUS001';
     _socket.stopListening(busId);
     _socket.stopListeningAlerts(busId);
+    _socket.stopListeningToTripEvents();
     super.dispose();
   }
 
@@ -307,12 +350,18 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                     Text(
                                         _connected
                                           ? 'LIVE'
+                                            : _tripCompleted && _lastUpdate == 'Trip completed'
+                                              ? 'COMPLETED'
                                           : widget.adminMode
                                             ? 'LOCATION UNAVAILABLE'
                                             : 'WAITING',
                                       style: TextStyle(
                                         color: _connected
                                             ? const Color(0xFF2ECC71)
+                                            : _tripCompleted && _lastUpdate == 'Trip completed'
+                                              ? const Color(0xFF8892A4)
+                                            : _tripCompleted && _lastUpdate == 'Trip completed'
+                                              ? const Color(0xFF8892A4)
                                             : const Color(0xFFF7C948),
                                         fontSize: 9,
                                         fontWeight: FontWeight.w800,
@@ -377,6 +426,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                     title: 'Trip Intelligence',
                     subtitle: _connected
                         ? 'Live bus data, driver details and route stops in one view'
+                        : _tripCompleted && _lastUpdate == 'Trip completed'
+                          ? 'Trip completed: live location has ended'
                         : widget.adminMode
                             ? 'Location unavailable: this bus is not sending a live position'
                             : 'Waiting for the driver to broadcast location',

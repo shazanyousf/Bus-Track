@@ -2,6 +2,31 @@ const router = require('express').Router();
 const Bus = require('../models/Bus');
 const auth = require('../middleware/auth');
 
+router.get('/active-trips', auth, async (req, res) => {
+  try {
+    const buses = await Bus.find({ tripStatus: 'ACTIVE', trackingStatus: 'LIVE' })
+      .populate('routeId', 'routeName')
+      .populate('driverId', 'name phone');
+    res.json(buses.map((bus) => ({
+      busId: bus._id,
+      tripId: bus.tripId,
+      route: bus.routeId,
+      driver: bus.driverId,
+      startedAt: bus.tripStartedAt,
+      status: bus.tripStatus,
+      trackingStatus: bus.trackingStatus,
+    })));
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+router.get('/:id/active-trip', auth, async (req, res) => {
+  try {
+    const bus = await Bus.findOne({ _id: req.params.id, tripStatus: 'ACTIVE', trackingStatus: 'LIVE' }).populate('routeId', 'routeName');
+    if (!bus) return res.status(404).json({ message: 'No active trip' });
+    res.json({ busId: bus._id, tripId: bus.tripId, route: bus.routeId, startedAt: bus.tripStartedAt, status: bus.tripStatus, trackingStatus: bus.trackingStatus });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 // Get all buses (optionally filter by route)
 router.get('/', async (req, res) => {
   try {

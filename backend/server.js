@@ -4,8 +4,10 @@ const cors       = require('cors');
 const http       = require('http');
 const path       = require('path');
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
 const Bus = require('./models/Bus');
 const Registration = require('./models/Registration');
+const User = require('./models/User');
 require('dotenv').config();
 
 const app    = express();
@@ -55,19 +57,74 @@ app.get('/', (req, res) =>
   res.json({ message: 'BusTrack School API', version: '2.0' }));
 
 // ── Socket.io — Real-Time GPS Tracking ──────────────────────────────────────
-const activeBuses = {}; // { busId: { latitude, longitude, speed, timestamp } }
+const activeBuses = {}; // { busId: { busId, tripId, lat, lng, speed, timestamp } }
+const activeTrips = {}; // { busId: { busId, tripId, routeId, startedAt } }
 app.set('activeBuses', activeBuses);
+app.set('activeTrips', activeTrips);
 
 io.on('connection', (socket) => {
   console.log(`📱 Client connected: ${socket.id}`);
+  const token = socket.handshake.auth?.token;
+  if (token) {
+    try {
+      socket.user = jwt.verify(token, process.env.JWT_SECRET || 'bustrack_secret');
+    } catch (_) {
+      socket.user = null;
+    }
+  }
 
   // Driver sends their GPS location
   // Payload: { busId, latitude, longitude, speed }
- socket.on('driver:location', (data) => {
-  if (!data.busId) return;
+ socket.on('driver:trip:start', async (data) => {
+  if (!data.busId || !data.tripId) return;
+  if (socket.user?.role !== 'driver') return;
+  const driver = await User.findOne({ _id: socket.user.id, role: 'driver', busId: data.busId }).select('_id').lean().catch(() => null);
+  if (!driver) return;
+  const bus = await Bus.findOneAndUpdate({
+    _id: data.busId,
+    tripStatus: { $ne: 'ACTIVE' },
+    tripId: { $ne: data.tripId },
+  }, {
+    $set: {
+      tripStatus: 'ACTIVE', trackingStatus: 'LIVE', tripId: data.tripId,
+      tripStartedAt: new Date(), tripCompletedAt: null,
+    },
+  }, { new: true }).catch(() => null);
+  if (!bus) return;
+  const trip = { busId: data.busId, tripId: data.tripId, routeId: bus.routeId?.toString(), startedAt: bus.tripStartedAt };
+  activeTrips[data.busId] = trip;
+  io.emit('trip:started', trip);
+});
+
+ socket.on('driver:trip:complete', async (data) => {
+  if (!data.busId || !data.tripId) return;
+  if (socket.user?.role !== 'driver') return;
+  const driver = await User.findOne({ _id: socket.user.id, role: 'driver', busId: data.busId }).select('_id').lean().catch(() => null);
+  if (!driver) return;
+  const bus = await Bus.findOneAndUpdate(
+    { _id: data.busId, tripId: data.tripId, tripStatus: 'ACTIVE' },
+    { $set: { tripStatus: 'COMPLETED', trackingStatus: 'OFFLINE', tripCompletedAt: new Date() } },
+    { new: true },
+  ).catch(() => null);
+  if (!bus) return;
+  delete activeTrips[data.busId];
+  delete activeBuses[data.busId];
+  io.emit('trip:completed', { busId: data.busId, tripId: data.tripId, completedAt: bus.tripCompletedAt });
+});
+
+ socket.on('driver:location', async (data) => {
+  if (!data.busId || !data.tripId) return;
+  if (socket.user?.role !== 'driver') return;
+  const driver = await User.findOne({ _id: socket.user.id, role: 'driver', busId: data.busId }).select('_id').lean().catch(() => null);
+  if (!driver) return;
+  const trip = activeTrips[data.busId];
+  if (!trip || trip.tripId !== data.tripId) return;
+  const bus = await Bus.findOne({ _id: data.busId, tripId: data.tripId, tripStatus: 'ACTIVE', trackingStatus: 'LIVE' }).select('_id').lean();
+  if (!bus) return;
 
   const formattedData = {
     busId: data.busId,
+    tripId: data.tripId,
     lat: data.lat,
     lng: data.lng,
     speed: data.speed,
@@ -83,7 +140,7 @@ io.on('connection', (socket) => {
 
   // Client can request last known position on connect
   socket.on('bus:request', (busId) => {
-  if (activeBuses[busId]) {
+  if (activeTrips[busId] && activeBuses[busId]) {
     socket.emit(`bus:location:${busId}`, activeBuses[busId]);
   }
 });
@@ -147,10 +204,23 @@ async function reconcileBusSeats() {
   console.log(`🪑 Reconciled seats for ${buses.length} bus(es)`);
 }
 
+async function hydrateActiveTrips() {
+  const buses = await Bus.find({ tripStatus: 'ACTIVE', trackingStatus: 'LIVE' }).select('_id tripId routeId tripStartedAt').lean();
+  buses.forEach((bus) => {
+    activeTrips[bus._id.toString()] = {
+      busId: bus._id.toString(),
+      tripId: bus.tripId,
+      routeId: bus.routeId?.toString(),
+      startedAt: bus.tripStartedAt,
+    };
+  });
+  console.log(`🚍 Restored ${buses.length} active trip(s)`);
+}
+
 mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected');
-    return reconcileBusSeats();
+    return reconcileBusSeats().then(hydrateActiveTrips);
   })
   .then(() => {
     

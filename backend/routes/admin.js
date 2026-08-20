@@ -23,7 +23,7 @@ router.get('/dashboard/stats', auth, auth.adminOnly, async (req, res) => {
     const countStatus = (status) => registrations.filter((registration) => registration.status === status).length;
     const paidPayments = registrations.filter((registration) => registration.paymentStatus === 'PAID');
     const activeBuses = buses.filter((bus) => bus.status === 'active');
-    const liveBuses = req.app.get('activeBuses') || {};
+    const liveTrips = req.app.get('activeTrips') || {}; // This line remains unchanged
     const activities = [
       ...registrations.slice().sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)).slice(0, 10).map((registration) => ({
         type: registration.status === 'active' && registration.assignmentStatus === 'ASSIGNED'
@@ -54,7 +54,7 @@ router.get('/dashboard/stats', auth, auth.adminOnly, async (req, res) => {
       totalCollected: paidPayments.reduce((sum, registration) => sum + (Number(registration.paymentAmount) || 0), 0),
       activeBuses: activeBuses.length,
       inactiveBuses: buses.filter((bus) => bus.status !== 'active').length,
-      trackingBuses: Object.keys(liveBuses).filter((busId) => buses.some((bus) => bus._id.toString() === busId)).length,
+      trackingBuses: buses.filter((bus) => bus.tripStatus === 'ACTIVE' && bus.trackingStatus === 'LIVE').length,
       busFleet: buses.map((bus) => ({
         busNumber: bus.busNumber,
         totalSeats: bus.totalSeats,
