@@ -25,6 +25,9 @@ class _ParentHomeState extends State<ParentHome> {
   int _currentIndex = 0;
   List _registrations = [];
   List _activeTrips = [];
+  final Map<String, Map<String, dynamic>> _liveLocations = {};
+  final Set<String> _completedBusIds = {};
+  final Set<String> _listeningBusIds = {};
   bool _loading = true;
 
   @override
@@ -48,10 +51,16 @@ class _ParentHomeState extends State<ParentHome> {
       if (mounted) _loadData();
     });
     _socket.listenToTripStarted((_) {
+      _completedBusIds.clear();
       if (mounted) _loadData();
     });
     _socket.listenToTripCompleted((update) {
       if (mounted) {
+        final busId = update['busId']?.toString();
+        if (busId != null) {
+          _completedBusIds.add(busId);
+          _liveLocations.remove(busId);
+        }
         _loadData();
         NotificationService.instance.show(
           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -81,6 +90,14 @@ class _ParentHomeState extends State<ParentHome> {
           .map((registration) => registration['busId']?['_id']?.toString())
           .whereType<String>()
           .toSet();
+      for (final busId in assignedBusIds) {
+        if (_listeningBusIds.add(busId)) {
+          _socket.listenToBus(busId, (location) {
+            if (!mounted) return;
+            setState(() => _liveLocations[busId] = location);
+          });
+        }
+      }
       setState(() {
         _registrations = regs;
         _activeTrips = trips.where((trip) => assignedBusIds.contains(trip['busId']?.toString())).toList();
@@ -101,6 +118,8 @@ class _ParentHomeState extends State<ParentHome> {
         userName: auth.user?['name'] ?? 'Parent',
         approved: approved,
         activeTrips: _activeTrips,
+        liveLocations: _liveLocations,
+        completedBusIds: _completedBusIds,
         loading: _loading,
         onRefresh: _loadData,
         onRegister: () => setState(() => _currentIndex = 2),
@@ -158,6 +177,8 @@ class _DashboardTab extends StatelessWidget {
   final String userName;
   final List approved;
   final List activeTrips;
+  final Map<String, Map<String, dynamic>> liveLocations;
+  final Set<String> completedBusIds;
   final bool loading;
   final VoidCallback onRefresh;
   final VoidCallback onRegister;
@@ -169,6 +190,8 @@ class _DashboardTab extends StatelessWidget {
     required this.userName,
     required this.approved,
     required this.activeTrips,
+    required this.liveLocations,
+    required this.completedBusIds,
     required this.loading,
     required this.onRefresh,
     required this.onRegister,
@@ -267,18 +290,18 @@ class _DashboardTab extends StatelessWidget {
               ),
               const SizedBox(height: 18),
 
-              // Assigned bus card
-              if (activeTrips.isNotEmpty) ...[
-                _ActiveTripBanner(trip: activeTrips.first),
-                const SizedBox(height: 18),
-              ],
               if (approved.isNotEmpty) ...[
                 const _SectionHeader(
                   title: 'Assigned Bus',
                   subtitle: 'Your approved bus and driver details',
                 ),
                 const SizedBox(height: 12),
-                _AssignedBusCard(registration: approved.first),
+                _AssignedBusCard(
+                  registration: approved.first,
+                  activeTrips: activeTrips,
+                  liveLocations: liveLocations,
+                  completedBusIds: completedBusIds,
+                ),
                 const SizedBox(height: 24),
               ],
 
@@ -334,42 +357,6 @@ class _DashboardTab extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ActiveTripBanner extends StatelessWidget {
-  const _ActiveTripBanner({required this.trip});
-  final Map trip;
-
-  @override
-  Widget build(BuildContext context) {
-    final route = trip['route'] is Map ? trip['route'] as Map : {};
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF123A35),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2ECC71).withValues(alpha: 0.45)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.radar_rounded, color: Color(0xFF2ECC71), size: 25),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('TRIP IN PROGRESS', style: TextStyle(color: Color(0xFF75E3A2), fontSize: 11, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 3),
-                Text('Bus ${trip['busId'] ?? ''} is currently on trip', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-                Text(route['routeName']?.toString() ?? 'Live location available', style: const TextStyle(color: Color(0xFFA7C8BD), fontSize: 11)),
-              ],
-            ),
-          ),
-          const Icon(Icons.circle, color: Color(0xFF2ECC71), size: 10),
-        ],
       ),
     );
   }
@@ -476,7 +463,16 @@ class _SectionHeader extends StatelessWidget {
 
 class _AssignedBusCard extends StatelessWidget {
   final Map registration;
-  const _AssignedBusCard({required this.registration});
+  final List activeTrips;
+  final Map<String, Map<String, dynamic>> liveLocations;
+  final Set<String> completedBusIds;
+
+  const _AssignedBusCard({
+    required this.registration,
+    required this.activeTrips,
+    required this.liveLocations,
+    required this.completedBusIds,
+  });
 
   Map _safeMap(dynamic value) {
     if (value is Map) return value as Map;
@@ -525,6 +521,25 @@ class _AssignedBusCard extends StatelessWidget {
     final route  = _safeMap(registration['routeId']).isNotEmpty
         ? _safeMap(registration['routeId'])
         : _safeMap(bus['routeId']);
+    final busId = bus['_id']?.toString();
+    final matchingTrips = activeTrips.cast<Map>().where(
+      (trip) => trip['busId']?.toString() == busId,
+    ).toList();
+    final activeTrip = matchingTrips.isEmpty ? null : matchingTrips.first;
+    final location = busId == null ? null : liveLocations[busId];
+    final hasLocation = location != null &&
+      (location['lat'] is num || location['latitude'] is num) &&
+      (location['lng'] is num || location['longitude'] is num);
+    final status = completedBusIds.contains(busId) || bus['tripStatus'] == 'COMPLETED'
+      ? 'TRIP COMPLETED'
+      : activeTrip != null && activeTrip['status'] == 'ACTIVE' && activeTrip['trackingStatus'] == 'LIVE'
+        ? hasLocation ? 'LIVE' : 'WAITING'
+        : 'NOT TRACKING';
+    final statusColor = status == 'LIVE'
+      ? const Color(0xFF2ECC71)
+      : status == 'WAITING'
+        ? const Color(0xFFF7C948)
+        : const Color(0xFF8892A4);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -571,14 +586,14 @@ class _AssignedBusCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2ECC71).withValues(alpha: 0.15),
+                  color: statusColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: const Color(0xFF2ECC71).withValues(alpha: 0.4)),
+                    color: statusColor.withValues(alpha: 0.4)),
                 ),
-                child: const Text('Active',
+                  child: Text(status,
                     style: TextStyle(
-                        color: Color(0xFF2ECC71),
+                      color: statusColor,
                         fontSize: 11,
                         fontWeight: FontWeight.w700)),
               ),
@@ -623,6 +638,7 @@ class _AssignedBusCard extends StatelessWidget {
                 onPressed: () => _trackBus(bus, context),
                 icon: const Icon(Icons.location_on_rounded,
                     color: Color(0xFF4A9EFF), size: 22),
+                tooltip: 'Track bus',
               ),
             ],
           ),
