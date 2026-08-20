@@ -8,8 +8,9 @@ import '../../services/socket_service.dart';
 
 class LiveTrackingScreen extends StatefulWidget {
   final Map bus;
+  final bool adminMode;
 
-  const LiveTrackingScreen({super.key, required this.bus});
+  const LiveTrackingScreen({super.key, required this.bus, this.adminMode = false});
 
   @override
   State<LiveTrackingScreen> createState() => _LiveTrackingScreenState();
@@ -304,7 +305,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      _connected ? 'LIVE' : 'WAITING',
+                                        _connected
+                                          ? 'LIVE'
+                                          : widget.adminMode
+                                            ? 'LOCATION UNAVAILABLE'
+                                            : 'WAITING',
                                       style: TextStyle(
                                         color: _connected
                                             ? const Color(0xFF2ECC71)
@@ -372,7 +377,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                     title: 'Trip Intelligence',
                     subtitle: _connected
                         ? 'Live bus data, driver details and route stops in one view'
-                        : 'Waiting for the driver to broadcast location',
+                        : widget.adminMode
+                            ? 'Location unavailable: this bus is not sending a live position'
+                            : 'Waiting for the driver to broadcast location',
                   ),
                   const SizedBox(height: 16),
                   Row(

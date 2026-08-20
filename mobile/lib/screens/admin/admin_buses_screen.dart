@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
+import '../parent/live_tracking_screen.dart';
 
 class AdminBusesScreen extends StatefulWidget {
   const AdminBusesScreen({super.key, this.onBack});
@@ -324,6 +325,20 @@ class _AdminBusesScreenState extends State<AdminBusesScreen> {
                                                 color: Color(0xFF8892A4), fontSize: 12)),
                                       ],
                                     ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => LiveTrackingScreen(
+                                          bus: bus,
+                                          adminMode: true,
+                                        ),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.location_searching_rounded,
+                                        color: Color(0xFF2ECC71), size: 21),
+                                    tooltip: 'Track live location',
                                   ),
                                   IconButton(
                                     onPressed: () => _showEditBusDialog(bus),
