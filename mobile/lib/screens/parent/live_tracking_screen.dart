@@ -86,6 +86,27 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       );
     }
 
+    markers.add(
+      Marker(
+        key: const ValueKey('bus'),
+        point: _busPosition,
+        width: 48,
+        height: 48,
+        builder: (ctx) => Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF101A2C).withValues(alpha: 0.9),
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFFFFA15F), width: 2),
+          ),
+          child: const Icon(
+            Icons.directions_bus_rounded,
+            color: Color(0xFFFFA15F),
+            size: 30,
+          ),
+        ),
+      ),
+    );
+
     final stopPositions = _stopPositions;
     if (stopPositions.length >= 2) {
       _polylines = [
@@ -101,14 +122,18 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   }
 
   Future<void> _startListening() async {
-    final busId = widget.bus['_id'] as String? ??
-        widget.bus['busNumber'] as String? ??
+    final busId = widget.bus['_id']?.toString() ??
+      widget.bus['busNumber']?.toString() ??
         'BUS001';
+
+    await _socket.waitForConnection();
+    if (!mounted) return;
 
     _socket.listenToTripStarted((data) {
       if (data['busId']?.toString() != busId || !mounted) return;
       final tripId = data['tripId']?.toString();
       if (tripId == null || tripId.isEmpty) return;
+      debugPrint('PARENT TRIP START RECEIVED busId=$busId tripId=$tripId');
       setState(() {
         _tripId = tripId;
         _tripStartedBySocket = true;
@@ -133,16 +158,25 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       );
     });
 
-    _socket.listenToBus(busId, (data) {
-      if (_tripCompleted || _tripId == null || data['tripId']?.toString() != _tripId) return;
-      final lat = (data['lat'] as num?)?.toDouble();
-      final lng = (data['lng'] as num?)?.toDouble();
+    void applyLocation(Map<String, dynamic> data) {
+      final incomingTripId = data['tripId']?.toString();
+      if (_tripCompleted) return;
+      if (_tripId == null && incomingTripId != null && incomingTripId.isNotEmpty) {
+        _tripId = incomingTripId;
+      }
+      if (_tripId != null && incomingTripId != null && incomingTripId != _tripId) {
+        debugPrint('PARENT TRIP UPDATED busId=$busId oldTripId=$_tripId newTripId=$incomingTripId');
+        _tripId = incomingTripId;
+        _tripCompleted = false;
+      }
+      final lat = ((data['lat'] ?? data['latitude']) as num?)?.toDouble();
+      final lng = ((data['lng'] ?? data['longitude']) as num?)?.toDouble();
       final speed = (data['speed'] as num?)?.toDouble() ?? 0;
 
       if (lat == null || lng == null) return;
 
       final newPos = LatLng(lat, lng);
-      _mapController.move(newPos, 15);
+      debugPrint('PARENT LOCATION RECEIVED busId=$busId tripId=${incomingTripId ?? 'none'} lat=$lat lng=$lng');
 
       setState(() {
         _busPosition = newPos;
@@ -165,22 +199,47 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
           ),
         );
       });
-    });
+
+      try {
+        _mapController.move(newPos, 15);
+      } catch (_) {
+        // The marker remains visible even if the map is not ready yet.
+      }
+    }
+
+    _socket.listenToBus(busId, applyLocation);
 
     try {
       final token = context.read<AuthService>().token;
       if (token == null) throw Exception('Not authenticated');
       final activeTrip = await ApiService.getActiveTrip(busId, token);
       if (!mounted) return;
-      setState(() {
-        _tripId = activeTrip['tripId']?.toString();
-        _tripStartedBySocket = false;
-        _tripCompleted = false;
-        _lastUpdate = 'Waiting for signal...';
-      });
+      final activeTripId = activeTrip['tripId']?.toString();
+      if (activeTripId == null || activeTripId.isEmpty) throw Exception('Active trip has no tripId');
+      if (!_tripStartedBySocket) {
+        setState(() {
+          _tripId = activeTripId;
+          _tripCompleted = false;
+          _lastUpdate = 'Waiting for signal...';
+        });
+      }
+
+      final currentLocation = _safeMap(activeTrip['currentLocation']);
+      final fallbackLat = (currentLocation['latitude'] as num?)?.toDouble();
+      final fallbackLng = (currentLocation['longitude'] as num?)?.toDouble();
+      if (fallbackLat != null &&
+          fallbackLng != null &&
+          (fallbackLat != 0 || fallbackLng != 0)) {
+        applyLocation({
+          'tripId': activeTripId,
+          'latitude': fallbackLat,
+          'longitude': fallbackLng,
+          'speed': 0,
+        });
+      }
     } catch (_) {
       if (!mounted) return;
-      if (!_tripStartedBySocket) {
+      if (!_tripStartedBySocket && _tripId == null) {
         setState(() {
           _tripId = null;
           _tripCompleted = true;
@@ -190,7 +249,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         });
       }
     }
-    _socket.requestBusLocation(busId);
+    await _socket.requestBusLocation(busId);
     _socket.listenToTripCompleted((data) {
       if (data['busId']?.toString() != busId) return;
       if (!mounted) return;

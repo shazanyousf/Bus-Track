@@ -135,23 +135,18 @@ io.on('connection', (socket) => {
  socket.on('driver:location', async (data) => {
   const lat = Number(data.latitude ?? data.lat);
   const lng = Number(data.longitude ?? data.lng);
-  console.log('LOCATION RECEIVED', { driverId: socket.user?.id || 'anonymous', busId: data.busId, tripId: data.tripId, lat, lng });
-  if (!data.busId || !data.tripId) return console.log('LOCATION REJECTED: busId and tripId are required');
+  console.log('LOCATION RECEIVED', { driverId: socket.user?.id || 'anonymous', busId: data.busId, tripId: data.tripId || null, lat, lng });
+  if (!data.busId) return console.log('LOCATION REJECTED: busId is required');
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return console.log('LOCATION REJECTED: latitude/longitude are invalid');
   const authorization = await driverCanUseBus(data.busId);
   if (!authorization.ok) return console.log(`LOCATION REJECTED: ${authorization.reason}`);
-  const bus = await Bus.findOne({ _id: data.busId, tripId: data.tripId, tripStatus: 'ACTIVE', trackingStatus: 'LIVE' }).select('_id').lean();
-  if (!bus) return console.log('LOCATION REJECTED: bus trip is not ACTIVE/LIVE or tripId does not match');
-
-  const trip = activeTrips[data.busId] || {
-    busId: data.busId,
-    tripId: data.tripId,
-  };
-  if (trip.tripId !== data.tripId) return console.log('LOCATION REJECTED: in-memory tripId does not match');
+  const bus = await Bus.findOne({ _id: data.busId, tripStatus: 'ACTIVE', trackingStatus: 'LIVE' }).select('_id tripId').lean();
+  if (!bus) return console.log('LOCATION REJECTED: bus is not ACTIVE/LIVE');
+  const tripId = data.tripId || bus.tripId || null;
 
   const formattedData = {
     busId: data.busId,
-    tripId: data.tripId,
+    tripId,
     lat,
     lng,
     latitude: lat,
@@ -161,7 +156,6 @@ io.on('connection', (socket) => {
   };
 
   activeBuses[data.busId] = formattedData;
-  activeTrips[data.busId] = trip;
   await Bus.updateOne({ _id: data.busId }, { $set: { 'currentLocation.latitude': lat, 'currentLocation.longitude': lng } }).catch((error) => {
     console.log(`LOCATION PERSIST FAILED: ${error.message}`);
   });
@@ -173,10 +167,34 @@ io.on('connection', (socket) => {
 });
 
   // Client can request last known position on connect
-  socket.on('bus:request', (busId) => {
-  if (activeTrips[busId] && activeBuses[busId]) {
-    socket.emit(`bus:location:${busId}`, activeBuses[busId]);
+  socket.on('bus:request', async (busId) => {
+  if (!busId) return;
+  if (activeBuses[busId]) {
+    return socket.emit(`bus:location:${busId}`, activeBuses[busId]);
   }
+
+  const bus = await Bus.findOne({
+    _id: busId,
+    tripStatus: 'ACTIVE',
+    trackingStatus: 'LIVE',
+  }).select('_id tripId currentLocation updatedAt').lean().catch(() => null);
+  const latitude = Number(bus?.currentLocation?.latitude);
+  const longitude = Number(bus?.currentLocation?.longitude);
+  if (!bus || !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+      (latitude === 0 && longitude === 0)) {
+    return;
+  }
+
+  socket.emit(`bus:location:${busId}`, {
+    busId,
+    tripId: bus.tripId,
+    lat: latitude,
+    lng: longitude,
+    latitude,
+    longitude,
+    speed: 0,
+    timestamp: bus.updatedAt?.toISOString() || new Date().toISOString(),
+  });
 });
 
   // Driver issue / traffic update -> broadcast to all parents for this bus

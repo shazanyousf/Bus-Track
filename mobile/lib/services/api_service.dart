@@ -50,15 +50,19 @@ class ApiService {
       };
 
   // ── Buses ───────────────────────────────────────────────
-  static Future<List> getBuses({String? routeId}) async {
+  static Future<List> getBuses({String? routeId, String? token, String source = 'BUS'}) async {
     final query = routeId != null ? '?routeId=$routeId' : '';
-    final res = await http.get(Uri.parse('$baseUrl/buses$query')).timeout(_timeout);
+    final url = '$baseUrl/buses$query';
+    final res = await http.get(
+      Uri.parse(url),
+      headers: token == null ? null : headers(token),
+    ).timeout(_timeout);
+    debugPrint('[$source BUS FETCH] URL = $url');
+    debugPrint('[$source BUS FETCH] status = ${res.statusCode}');
+    debugPrint('[$source BUS FETCH] body = ${res.body}');
     if (res.statusCode == 200) {
       final buses = jsonDecode(res.body) as List;
-      debugPrint('BUS LIST RESPONSE: status=${res.statusCode} count=${buses.length}');
-      for (final bus in buses) {
-        debugPrint('BUS LIST ITEM: id=${bus['_id']} bus=${bus['busNumber']}');
-      }
+      debugPrint('[$source PARSED BUS COUNT] = ${buses.length}');
       return buses;
     }
     throw Exception('Failed to load buses');

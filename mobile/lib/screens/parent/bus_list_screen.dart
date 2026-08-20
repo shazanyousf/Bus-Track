@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import 'bus_detail_screen.dart';
 
 class BusListScreen extends StatefulWidget {
@@ -23,23 +26,45 @@ class _BusListScreenState extends State<BusListScreen> {
 
   Future<void> _loadAll() async {
     setState(() => _loading = true);
+    final auth = context.read<AuthService>();
+    final token = auth.token;
+    debugPrint('[PARENT AUTH] Current user ID = ${auth.user?['_id'] ?? auth.user?['id']}');
+    debugPrint('[PARENT AUTH] Current role = ${auth.user?['role']}');
+    debugPrint('[PARENT AUTH] JWT exists = ${token != null && token.isNotEmpty}');
+    debugPrint('Flutter API BASE URL = ${ApiService.baseUrl}');
+    debugPrint('Flutter Socket URL = ${SocketService().socketUrl}');
     try {
-      final results = await Future.wait([
-        ApiService.getBuses(routeId: _selectedRouteId),
-        ApiService.getRoutes(),
-      ]);
+      final buses = await ApiService.getBuses(
+        routeId: _selectedRouteId,
+        token: token,
+        source: 'PARENT',
+      );
+      if (!mounted) return;
       setState(() {
-        _buses  = results[0];
-        _routes = results[1];
+        _buses = buses;
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+      final firstBus = buses.isEmpty ? null : buses.first;
+      debugPrint('[PARENT BUS STATE] count=${_buses.length}');
+      debugPrint('[PARENT BUS STATE] firstBus=$firstBus');
+      debugPrint('[PARENT BUS STATE] firstBusId=${firstBus is Map ? firstBus['_id'] : null}');
+      debugPrint('[PARENT BUS STATE] firstBusNumber=${firstBus is Map ? firstBus['busNumber'] : null}');
+
+      try {
+        final routes = await ApiService.getRoutes();
+        if (mounted) setState(() => _routes = routes);
+      } catch (error) {
+        debugPrint('[PARENT ROUTES FETCH] error = $error');
+      }
+    } catch (error) {
+      debugPrint('[PARENT BUS FETCH] error = $error');
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[PARENT BUS BUILD] count=${_buses.length} loading=$_loading');
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

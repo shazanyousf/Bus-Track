@@ -82,9 +82,13 @@ class _ParentHomeState extends State<ParentHome> {
 
   Future<void> _loadData() async {
     final auth = context.read<AuthService>();
+    debugPrint('[PARENT AUTH] Current user ID = ${auth.user?['_id'] ?? auth.user?['id']}');
+    debugPrint('[PARENT AUTH] Current role = ${auth.user?['role']}');
+    debugPrint('[PARENT AUTH] JWT exists = ${auth.token != null && auth.token!.isNotEmpty}');
+    debugPrint('Flutter API BASE URL = ${ApiService.baseUrl}');
+    debugPrint('Flutter Socket URL = ${_socket.socketUrl}');
     try {
       final regs = await ApiService.getRegistrations(auth.token!);
-      final trips = await ApiService.getActiveTrips(auth.token!);
       final assignedBusIds = regs
           .where((registration) => registration['status'] == 'active')
           .map((registration) => registration['busId']?['_id']?.toString())
@@ -100,11 +104,27 @@ class _ParentHomeState extends State<ParentHome> {
       }
       setState(() {
         _registrations = regs;
-        _activeTrips = trips.where((trip) => assignedBusIds.contains(trip['busId']?.toString())).toList();
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+      debugPrint('[PARENT REGISTRATION STATE] count=${_registrations.length}');
+      for (final registration in _registrations) {
+        final bus = registration['busId'];
+        debugPrint('[PARENT ASSIGNMENT] registrationId=${registration['_id']} assignedBusId=${bus is Map ? bus['_id'] : bus}');
+      }
+
+      try {
+        final trips = await ApiService.getActiveTrips(auth.token!);
+        if (mounted) {
+          setState(() {
+            _activeTrips = trips.where((trip) => assignedBusIds.contains(trip['busId']?.toString())).toList();
+          });
+        }
+      } catch (error) {
+        debugPrint('[PARENT ACTIVE TRIPS FETCH] error = $error');
+      }
+    } catch (error) {
+      debugPrint('[PARENT REGISTRATIONS FETCH] error = $error');
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -112,6 +132,7 @@ class _ParentHomeState extends State<ParentHome> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
     final approved = _registrations.where((r) => r['status'] == 'active').toList();
+    debugPrint('[PARENT HOME BUILD] loading=$_loading registrations=${_registrations.length} approved=${approved.length}');
 
     final pages = [
       _DashboardTab(
@@ -540,6 +561,7 @@ class _AssignedBusCard extends StatelessWidget {
       : status == 'WAITING'
         ? const Color(0xFFF7C948)
         : const Color(0xFF8892A4);
+    debugPrint('[PARENT RENDER] buses.length=not_loaded_in_parent_home assignedBus=$bus assignedBusId=$busId busNumber=${bus['busNumber']} shouldRender=${bus.isNotEmpty && busId != null}');
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -681,6 +703,7 @@ class _AssignedBusPage extends StatelessWidget {
         : _safeMap(bus['routeId']);
     final driver = _safeMap(bus['driverId']);
     final stops  = (route['stops'] as List?) ?? [];
+    debugPrint('[PARENT ASSIGNED PAGE RENDER] assignedBus=$bus assignedBusId=${bus['_id']} busNumber=${bus['busNumber']} shouldRender=${bus.isNotEmpty && bus['_id'] != null}');
 
     return SafeArea(
       child: SingleChildScrollView(

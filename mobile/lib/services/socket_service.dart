@@ -176,8 +176,11 @@ class SocketService {
   }
 
   /// Request the current known position for a bus from the server.
-  void requestBusLocation(String busId) {
-    _socket?.emit('bus:request', busId);
+  Future<bool> requestBusLocation(String busId) async {
+    final connected = await waitForConnection();
+    if (!connected) return false;
+    _socket!.emit('bus:request', busId);
+    return true;
   }
   void listenToProfileUpdates(void Function(Map<String, dynamic>) onUpdate) {
     _socket?.on('profile:updated', (data) {

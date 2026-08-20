@@ -36,7 +36,7 @@ router.get('/:id/active-trip', auth, async (req, res) => {
   try {
     const bus = await Bus.findOne({ _id: req.params.id, tripStatus: 'ACTIVE', trackingStatus: 'LIVE' }).populate('routeId', 'routeName');
     if (!bus) return res.status(404).json({ message: 'No active trip' });
-    res.json({ busId: bus._id, tripId: bus.tripId, route: bus.routeId, startedAt: bus.tripStartedAt, status: bus.tripStatus, trackingStatus: bus.trackingStatus });
+    res.json({ busId: bus._id, tripId: bus.tripId, route: bus.routeId, startedAt: bus.tripStartedAt, status: bus.tripStatus, trackingStatus: bus.trackingStatus, currentLocation: bus.currentLocation });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 

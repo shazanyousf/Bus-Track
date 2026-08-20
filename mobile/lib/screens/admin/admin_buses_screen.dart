@@ -40,20 +40,44 @@ class _AdminBusesScreenState extends State<AdminBusesScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final auth = context.read<AuthService>();
+    debugPrint('[ADMIN AUTH] Current user ID = ${auth.user?['_id'] ?? auth.user?['id']}');
+    debugPrint('[ADMIN AUTH] Current role = ${auth.user?['role']}');
+    debugPrint('[ADMIN AUTH] JWT exists = ${auth.token != null && auth.token!.isNotEmpty}');
+    debugPrint('Flutter API BASE URL = ${ApiService.baseUrl}');
+    debugPrint('Flutter Socket URL = ${_socket.socketUrl}');
     try {
-      final results = await Future.wait([
-        ApiService.getBuses(),
-        ApiService.getRoutes(),
-        ApiService.getDrivers(auth.token!),
-      ]);
+      final buses = await ApiService.getBuses(
+        token: auth.token,
+        source: 'ADMIN',
+      );
+      if (!mounted) return;
       setState(() {
-        _buses   = results[0];
-        _routes  = results[1];
-        _drivers = results[2];
+        _buses = buses;
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+      final firstBus = buses.isEmpty ? null : buses.first;
+      debugPrint('[ADMIN BUS STATE] count=${_buses.length}');
+      debugPrint('[ADMIN BUS STATE] firstBus=$firstBus');
+      debugPrint('[ADMIN BUS STATE] firstBusId=${firstBus is Map ? firstBus['_id'] : null}');
+      debugPrint('[ADMIN BUS STATE] firstBusNumber=${firstBus is Map ? firstBus['busNumber'] : null}');
+
+      try {
+        final results = await Future.wait([
+          ApiService.getRoutes(),
+          ApiService.getDrivers(auth.token!),
+        ]);
+        if (mounted) {
+          setState(() {
+            _routes = results[0];
+            _drivers = results[1];
+          });
+        }
+      } catch (error) {
+        debugPrint('[ADMIN SUPPORTING DATA] error = $error');
+      }
+    } catch (error) {
+      debugPrint('[ADMIN BUS FETCH] error = $error');
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -246,6 +270,7 @@ class _AdminBusesScreenState extends State<AdminBusesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[ADMIN BUS BUILD] count=${_buses.length} loading=$_loading');
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
