@@ -171,7 +171,7 @@ class _Header extends StatelessWidget {
     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Admin Dashboard', style: TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w800)),
       const SizedBox(height: 6),
-      const Text('BusTrack University', style: TextStyle(color: _orange, fontSize: 14, fontWeight: FontWeight.w700)),
+      const Text('BusTrack School', style: TextStyle(color: _orange, fontSize: 14, fontWeight: FontWeight.w700)),
       const SizedBox(height: 2),
       const Text('Transport Management Overview', style: TextStyle(color: _muted, fontSize: 12)),
       const SizedBox(height: 4),
