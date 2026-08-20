@@ -72,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             color: Colors.white,
                             fontSize: 28,
                             fontWeight: FontWeight.w900)),
-                    const Text('University Transport System',
+                    const Text('School Transport System',
                         style: TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
                   ],
                 ),

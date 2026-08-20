@@ -15,7 +15,7 @@ const User = require('./models/User');
 async function cleanup() {
   try {
     console.log('Connecting to MongoDB...');
-    const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/bustrack_university';
+    const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/bustrack_school';
     
     await mongoose.connect(MONGO_URI);
     console.log('✅ Connected to MongoDB');

@@ -10,28 +10,28 @@ const sign = (user) => jwt.sign(
 );
 
 const _sendEmail = async ({ to, subject, text, html }) => {
-  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+  if (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM) {
     return false;
   }
 
-  const response = await fetch('https://api.resend.com/emails', {
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'api-key': process.env.BREVO_API_KEY,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: process.env.EMAIL_FROM,
-      to: [to],
+      sender: { email: process.env.EMAIL_FROM, name: 'BusTrack' },
+      to: [{ email: to }],
       subject,
-      text,
-      html,
+      textContent: text,
+      htmlContent: html,
     }),
   });
 
   if (!response.ok) {
-    const details = await response.text();
-    throw new Error(`Resend email failed (${response.status}): ${details}`);
+    const error = await response.text();
+    throw new Error(`Brevo email failed (${response.status}): ${error}`);
   }
 
   return true;
@@ -91,16 +91,26 @@ router.post('/register', async (req, res) => {
     });
 
     // Send OTP email
-    await _sendEmail({
+    const emailSent = await _sendEmail({
       to: pending.email,
       subject: 'BusTrack Email Verification Code',
       text: `Your BusTrack verification code is ${verificationCode}. It expires in 10 minutes.`,
       html: `<p>Your BusTrack verification code is <strong>${verificationCode}</strong>.</p><p>This code expires in 10 minutes.</p>`,
-    }).catch(() => false);
+    });
+
+    if (!emailSent && process.env.SHOW_RESET_CODE !== 'true') {
+      await User.deleteOne({ _id: pending._id });
+      return res.status(503).json({
+        message: 'Verification email could not be sent. Check your Brevo API key and authorized sender address.',
+      });
+    }
 
     res.status(202).json({
-      message: 'Verification code sent to email. Please enter it to complete registration.',
+      message: emailSent
+        ? 'Verification code sent to email. Please enter it to complete registration.'
+        : 'Email delivery is disabled for development. Use the verification code shown by the backend.',
       email: normalizedEmail,
+      ...(process.env.SHOW_RESET_CODE === 'true' ? { verificationCode } : {}),
     });
   } catch (e) {
     res.status(500).json({ message: e.message || 'Registration failed' });
@@ -208,21 +218,16 @@ router.post('/forgot-password', async (req, res) => {
     const resetCodeExpiry = new Date(Date.now() + 10 * 60000); // 10 minutes
     await User.findByIdAndUpdate(user._id, { resetCode, resetCodeExpiry });
 
-    let emailSent = false;
-    try {
-      emailSent = await _sendEmail({
-        to: user.email,
-        subject: 'BusTrack Password Reset Code',
-        text: `Your BusTrack password reset code is ${resetCode}. It expires in 10 minutes.`,
-        html: `<p>Your BusTrack password reset code is <strong>${resetCode}</strong>.</p><p>This code expires in 10 minutes.</p>`,
-      });
-    } catch (emailError) {
-      console.error('Password reset email failed:', emailError.message);
-    }
+    const emailSent = await _sendEmail({
+      to: user.email,
+      subject: 'BusTrack Password Reset Code',
+      text: `Your BusTrack password reset code is ${resetCode}. It expires in 10 minutes.`,
+      html: `<p>Your BusTrack password reset code is <strong>${resetCode}</strong>.</p><p>This code expires in 10 minutes.</p>`,
+    }).catch(() => false);
 
     const message = emailSent
       ? 'Reset code sent to your registered email address.'
-      : 'Reset code generated, but the email could not be sent. Check the Resend sender configuration.';
+      : 'Reset code generated. Email sending is not configured on the server.';
 
     const response = { message };
     if (!emailSent && process.env.NODE_ENV !== 'production' && process.env.SHOW_RESET_CODE === 'true') {

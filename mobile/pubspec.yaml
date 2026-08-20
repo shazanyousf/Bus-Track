@@ -1,5 +1,5 @@
 name: bustrack
-description: University Bus Tracking System
+description: School Bus Tracking System
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -20,6 +20,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   url_launcher: ^6.3.2
   file_picker: ^8.1.2
+  flutter_local_notifications: ^17.2.3
 
 dev_dependencies:
   flutter_test:

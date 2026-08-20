@@ -2,6 +2,7 @@
 
     <!-- Internet -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <!-- GPS Permissions -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>

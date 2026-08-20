@@ -8,8 +8,7 @@ router.get('/', async (req, res) => {
     let settings = await Setting.findOne();
     if (!settings) {
       settings = await Setting.create({
-        departments: ['Computer Science', 'Software Engineering', 'Electrical Engineering', 'Mechanical Engineering'],
-        semesters: ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'],
+        classes: ['1', '2', '3', '4', '5', '6', '7', '8'],
       });
     }
     res.json(settings);
@@ -18,22 +17,19 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Admin updates the available departments and semesters.
+// Admin updates the available classes.
 router.put('/', auth, auth.adminOnly, async (req, res) => {
   try {
     const updates = {};
-    if (Array.isArray(req.body.departments)) updates.departments = req.body.departments;
-    if (Array.isArray(req.body.semesters)) updates.semesters = req.body.semesters;
+    if (Array.isArray(req.body.classes)) updates.classes = req.body.classes;
 
     let settings = await Setting.findOne();
     if (!settings) {
       settings = await Setting.create({
-        departments: updates.departments || ['Computer Science', 'Software Engineering', 'Electrical Engineering', 'Mechanical Engineering'],
-        semesters: updates.semesters || ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'],
+        classes: updates.classes || ['1', '2', '3', '4', '5', '6', '7', '8'],
       });
     } else {
-      if (updates.departments) settings.departments = updates.departments;
-      if (updates.semesters) settings.semesters = updates.semesters;
+      if (updates.classes) settings.classes = updates.classes;
       await settings.save();
     }
     res.json(settings);

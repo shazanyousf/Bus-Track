@@ -11,10 +11,10 @@ class AdminSettingsScreen extends StatefulWidget {
 }
 
 class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
-  List<String> _departments = [];
+  List<String> _classes = [];
   bool _loading = true;
   bool _saving = false;
-  final _deptCtrl = TextEditingController();
+  final _classCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -28,7 +28,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     try {
       final data = await ApiService.getSettings(auth.token!);
       setState(() {
-        _departments = List<String>.from(data['departments'] ?? []);
+        _classes = List<String>.from(data['classes'] ?? []);
         _loading = false;
       });
     } catch (_) {
@@ -41,7 +41,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     final auth = context.read<AuthService>();
     try {
       await ApiService.updateSettings(auth.token!, {
-        'departments': _departments,
+        'classes': _classes,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -61,17 +61,17 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
-  void _addDepartment() {
-    final value = _deptCtrl.text.trim();
+  void _addClass() {
+    final value = _classCtrl.text.trim();
     if (value.isEmpty) return;
     setState(() {
-      _departments.add(value);
-      _deptCtrl.clear();
+      _classes.add(value);
+      _classCtrl.clear();
     });
   }
 
-  void _removeDepartment(int index) {
-    setState(() => _departments.removeAt(index));
+  void _removeClass(int index) {
+    setState(() => _classes.removeAt(index));
   }
 
   @override
@@ -82,7 +82,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         backgroundColor: const Color(0xFF16213E),
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Manage Departments', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Manage Classes', style: TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)))
@@ -91,14 +91,14 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Departments', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+                  const Text('Classes', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
-                  _buildInputRow(_deptCtrl, 'Add department', _addDepartment),
+                  _buildInputRow(_classCtrl, 'Add class', _addClass),
                   const SizedBox(height: 12),
-                  ..._departments.asMap().entries.map((entry) {
+                  ..._classes.asMap().entries.map((entry) {
                     final i = entry.key;
                     final value = entry.value;
-                    return _buildChip(value, () => _removeDepartment(i));
+                    return _buildChip(value, () => _removeClass(i));
                   }).toList(),
                   const SizedBox(height: 28),
                   SizedBox(
@@ -113,7 +113,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                       ),
                       child: _saving
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Save Departments', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                          : const Text('Save Classes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                     ),
                   ),
                   const SizedBox(height: 20),

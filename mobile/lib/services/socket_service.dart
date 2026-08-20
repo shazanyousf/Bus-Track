@@ -1,6 +1,7 @@
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'notification_service.dart';
 
 /// Singleton that manages one Socket.io connection for the whole app.
 class SocketService {
@@ -97,7 +98,13 @@ class SocketService {
   void listenToBusAlerts(String busId, void Function(Map<String, dynamic>) onAlert) {
     _socket?.on('bus:alert:$busId', (data) {
       if (data is Map) {
-        onAlert(Map<String, dynamic>.from(data));
+        final alert = Map<String, dynamic>.from(data);
+        onAlert(alert);
+        NotificationService.instance.show(
+          id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+          title: 'BusTrack bus alert',
+          body: alert['message']?.toString() ?? 'A bus alert was received.',
+        );
       }
     });
   }
@@ -119,6 +126,25 @@ class SocketService {
   /// Request the current known position for a bus from the server.
   void requestBusLocation(String busId) {
     _socket?.emit('bus:request', busId);
+  }
+  void listenToProfileUpdates(void Function(Map<String, dynamic>) onUpdate) {
+    _socket?.on('profile:updated', (data) {
+      if (data is Map) onUpdate(Map<String, dynamic>.from(data));
+    });
+  }
+  void stopListeningToProfileUpdates() {
+    _socket?.off('profile:updated');
+  }
+
+  void listenToRegistrationUpdates(
+      void Function(Map<String, dynamic>) onUpdate) {
+    _socket?.on('registration:updated', (data) {
+      if (data is Map) onUpdate(Map<String, dynamic>.from(data));
+    });
+  }
+
+  void stopListeningToRegistrationUpdates() {
+    _socket?.off('registration:updated');
   }
 
   /// Stop listening to a bus (call when leaving the tracking screen).

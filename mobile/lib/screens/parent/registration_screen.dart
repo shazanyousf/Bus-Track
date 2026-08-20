@@ -22,13 +22,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   List _buses   = [];
   Map? _selectedBus;
   Map? _selectedStop;
-  String? _selectedDept;
-  String? _selectedSemester;
+  String? _selectedClass;
   bool _loading = false;
   bool _submitted = false;
 
-  List<String> _departments = [];
-  List<String> _semesters = [];
+  static const List<String> _classes = [
+    '1st', '2nd', '3rd', '4th', '5th',
+    '6th', '7th', '8th', '9th', '10th',
+  ];
 
   @override
   void initState() {
@@ -42,29 +43,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Future<void> _loadData() async {
     try {
-      final auth = context.read<AuthService>();
-      final results = await Future.wait<dynamic>([
-        ApiService.getBuses(),
-        ApiService.getSettings(auth.token!),
-      ]);
+      final buses = await ApiService.getBuses();
       setState(() {
-        _buses  = results[0] as List;
-        final settings = results[1] as Map;
-        _departments = List<String>.from(settings['departments'] ?? []);
-        _semesters = List<String>.from(settings['semesters'] ?? []);
+        _buses = buses;
       });
-    } catch (_) {
-      if (_departments.isEmpty) {
-        _departments = [
-          'Computer Science', 'Software Engineering', 'Electrical Engineering',
-          'Mechanical Engineering', 'Business Administration', 'Medicine',
-          'Law', 'Architecture', 'Mathematics', 'Physics',
-        ];
-      }
-      if (_semesters.isEmpty) {
-        _semesters = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
-      }
-    }
+    } catch (_) {}
   }
 
   Future<void> _submit() async {
@@ -81,7 +64,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       return;
     }
     if (_nameCtrl.text.trim().isEmpty || _idCtrl.text.trim().isEmpty ||
-        _selectedDept == null || _selectedSemester == null) {
+        _selectedClass == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Please complete all student fields before submitting'),
@@ -108,8 +91,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         'studentData': {
           'name':       _nameCtrl.text.trim(),
           'studentId':  _idCtrl.text.trim(),
-          'department': _selectedDept,
-          'semester':   _selectedSemester,
+          'class':       _selectedClass,
           'phone':      _phoneCtrl.text.trim(),
         }
       });
@@ -228,12 +210,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   nameCtrl:  _nameCtrl,
                   idCtrl:    _idCtrl,
                   phoneCtrl: _phoneCtrl,
-                  selectedDept:     _selectedDept,
-                  selectedSemester: _selectedSemester,
-                  departments: _departments,
-                  semesters:   _semesters,
-                  onDeptChanged:     (v) => setState(() => _selectedDept = v),
-                  onSemesterChanged: (v) => setState(() => _selectedSemester = v),
+                  selectedClass: _selectedClass,
+                  classes: _classes,
+                  onClassChanged: (v) => setState(() => _selectedClass = v),
                   onNext: () => setState(() => _step = 1),
                 ),
                 _SelectBusStep(
@@ -245,8 +224,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 _ConfirmStep(
                   nameCtrl:    _nameCtrl,
                   idCtrl:      _idCtrl,
-                  dept:        _selectedDept,
-                  semester:    _selectedSemester,
+                  studentClass: _selectedClass,
                   selectedBus: _selectedBus,
                   selectedStop: _selectedStop,
                   onStopChanged: (stop) => setState(() => _selectedStop = stop),
@@ -265,16 +243,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
 class _StudentInfoStep extends StatelessWidget {
   final TextEditingController nameCtrl, idCtrl, phoneCtrl;
-  final String? selectedDept, selectedSemester;
-  final List departments, semesters;
-  final ValueChanged<String?> onDeptChanged, onSemesterChanged;
+  final String? selectedClass;
+  final List classes;
+  final ValueChanged<String?> onClassChanged;
   final VoidCallback onNext;
 
   const _StudentInfoStep({
     required this.nameCtrl, required this.idCtrl, required this.phoneCtrl,
-    required this.selectedDept, required this.selectedSemester,
-    required this.departments, required this.semesters,
-    required this.onDeptChanged, required this.onSemesterChanged,
+    required this.selectedClass, required this.classes,
+    required this.onClassChanged,
     required this.onNext,
   });
 
@@ -293,19 +270,11 @@ class _StudentInfoStep extends StatelessWidget {
         _Field(label: 'Phone Number', ctrl: phoneCtrl, hint: '+91-98765-43210', type: TextInputType.phone),
         const SizedBox(height: 14),
         _DropdownField(
-          label: 'Department',
-          value: selectedDept,
-          items: departments.cast<String>(),
-          hint: 'Select Department',
-          onChanged: onDeptChanged,
-        ),
-        const SizedBox(height: 14),
-        _DropdownField(
-          label: 'Semester',
-          value: selectedSemester,
-          items: semesters.cast<String>(),
-          hint: 'Select Semester',
-          onChanged: onSemesterChanged,
+          label: 'Class',
+          value: selectedClass,
+          items: classes.cast<String>(),
+          hint: 'Select Class',
+          onChanged: onClassChanged,
         ),
         const SizedBox(height: 28),
         SizedBox(
@@ -435,7 +404,7 @@ class _SelectBusStep extends StatelessWidget {
 
 class _ConfirmStep extends StatelessWidget {
   final TextEditingController nameCtrl, idCtrl;
-  final String? dept, semester;
+  final String? studentClass;
   final Map? selectedBus;
   final Map? selectedStop;
   final ValueChanged<Map?> onStopChanged;
@@ -444,7 +413,7 @@ class _ConfirmStep extends StatelessWidget {
 
   const _ConfirmStep({
     required this.nameCtrl, required this.idCtrl,
-    required this.dept, required this.semester,
+    required this.studentClass,
     required this.selectedBus, required this.selectedStop,
     required this.onStopChanged, required this.loading,
     required this.onSubmit, required this.onBack,
@@ -456,8 +425,7 @@ class _ConfirmStep extends StatelessWidget {
     final rows  = [
       ['Student Name', nameCtrl.text.isEmpty ? 'N/A' : nameCtrl.text],
       ['Student ID',   idCtrl.text.isEmpty ? 'N/A' : idCtrl.text],
-      ['Department',   dept ?? 'N/A'],
-      ['Semester',     semester != null ? '$semester Semester' : 'N/A'],
+      ['Class',         studentClass ?? 'N/A'],
       ['Bus',          selectedBus?['busNumber'] ?? 'N/A'],
       ['Route',        route['routeName'] ?? 'N/A'],
       ['Stop',         selectedStop?['name'] ?? 'Not selected'],
@@ -613,7 +581,7 @@ class _SuccessView extends StatelessWidget {
                   textAlign: TextAlign.center),
               const SizedBox(height: 12),
               const Text(
-                  'Your request has been submitted. University admin will review and confirm within 24 hours.',
+                  'Your request has been submitted. School admin will review and confirm within 24 hours.',
                   style: TextStyle(color: Color(0xFF8892A4), fontSize: 14, height: 1.5),
                   textAlign: TextAlign.center),
               const SizedBox(height: 36),

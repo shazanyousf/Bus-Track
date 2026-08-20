@@ -13,7 +13,11 @@ router.post('/', auth, auth.adminOnly, async (req, res) => {
 });
 
 router.put('/:id', auth, auth.adminOnly, async (req, res) => {
-  try { res.json(await Driver.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
+  try {
+    const driver = await Driver.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    req.app.get('io')?.emit('profile:updated', { driverId: driver._id.toString(), role: 'driver' });
+    res.json(driver);
+  }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
 

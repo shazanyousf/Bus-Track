@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
+import '../../services/notification_service.dart';
 import '../login_screen.dart';
 import 'bus_list_screen.dart';
 import 'registration_screen.dart';
@@ -19,6 +21,7 @@ class ParentHome extends StatefulWidget {
 }
 
 class _ParentHomeState extends State<ParentHome> {
+    final SocketService _socket = SocketService();
   int _currentIndex = 0;
   List _registrations = [];
   bool _loading = true;
@@ -26,7 +29,30 @@ class _ParentHomeState extends State<ParentHome> {
   @override
   void initState() {
     super.initState();
+    final parentId = context.read<AuthService>().user?['_id']?.toString();
+    _socket.connect();
+    _socket.listenToProfileUpdates((_) {
+      if (mounted) _loadData();
+    });
+    _socket.listenToRegistrationUpdates((update) {
+      if (update['parentId']?.toString() != parentId) return;
+      final status = update['status']?.toString() ?? 'updated';
+      final studentName = update['studentName']?.toString() ?? 'Student';
+      NotificationService.instance.show(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title: 'Registration $status',
+        body: '$studentName\'s bus registration was $status.',
+      );
+      if (mounted) _loadData();
+    });
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _socket.stopListeningToProfileUpdates();
+    _socket.stopListeningToRegistrationUpdates();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -46,13 +72,11 @@ class _ParentHomeState extends State<ParentHome> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
     final approved = _registrations.where((r) => r['status'] == 'approved').toList();
-    final pending  = _registrations.where((r) => r['status'] == 'pending').toList();
 
     final pages = [
       _DashboardTab(
         userName: auth.user?['name'] ?? 'Parent',
         approved: approved,
-        pending: pending,
         loading: _loading,
         onRefresh: _loadData,
         onRegister: () => setState(() => _currentIndex = 2),
@@ -109,7 +133,6 @@ class _ParentHomeState extends State<ParentHome> {
 class _DashboardTab extends StatelessWidget {
   final String userName;
   final List approved;
-  final List pending;
   final bool loading;
   final VoidCallback onRefresh;
   final VoidCallback onRegister;
@@ -120,7 +143,6 @@ class _DashboardTab extends StatelessWidget {
   const _DashboardTab({
     required this.userName,
     required this.approved,
-    required this.pending,
     required this.loading,
     required this.onRefresh,
     required this.onRegister,
@@ -216,33 +238,6 @@ class _DashboardTab extends StatelessWidget {
                     _Avatar(name: greetingName),
                   ],
                 ),
-              ),
-              const SizedBox(height: 18),
-
-              // Stats row
-              const _SectionHeader(
-                title: 'Live Snapshot',
-                subtitle: 'Tap a card to jump to that section',
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _StatCard(
-                    label: 'Active Buses',
-                    value: approved.length.toString(),
-                    color: const Color(0xFF2ECC71),
-                    icon: Icons.directions_bus_rounded,
-                    onTap: onViewBuses,
-                  ),
-                  const SizedBox(width: 12),
-                  _StatCard(
-                    label: 'Pending',
-                    value: pending.length.toString(),
-                    color: const Color(0xFFF7C948),
-                    icon: Icons.hourglass_top_rounded,
-                    onTap: onOpenPending,
-                  ),
-                ],
               ),
               const SizedBox(height: 18),
 
@@ -374,70 +369,6 @@ class _Avatar extends StatelessWidget {
             name.isNotEmpty ? name[0].toUpperCase() : 'P',
             style: const TextStyle(
                 color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String label, value;
-  final Color color;
-  final IconData icon;
-  final VoidCallback? onTap;
-
-  const _StatCard(
-      {required this.label,
-      required this.value,
-      required this.color,
-      required this.icon,
-      this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF16213E),
-                  color.withValues(alpha: 0.12),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF2A3A5C)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, color: color, size: 22),
-                const SizedBox(height: 10),
-                Text(value,
-                    style: TextStyle(
-                        color: color, fontSize: 26, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 2),
-                Text(label,
-                    style: const TextStyle(color: Color(0xFF8892A4), fontSize: 12)),
-                const SizedBox(height: 8),
-                Text(
-                  'Tap to open',
-                  style: TextStyle(
-                    color: color.withValues(alpha: 0.8),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),

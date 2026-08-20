@@ -96,7 +96,7 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               const SizedBox(height: 8),
               const Text(
-                'UNIVERSITY TRANSPORT SYSTEM',
+                'SCHOOL TRANSPORT SYSTEM',
                 style: TextStyle(
                   color: Color(0xFFFF6B35),
                   fontSize: 11,

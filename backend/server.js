@@ -11,6 +11,7 @@ const server = http.createServer(app);
 const io     = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
+app.set('io', io);
 
 app.use(cors());
 app.use(express.json());
@@ -38,16 +39,17 @@ app.use('/api/settings',      require('./routes/settings'));
 app.use('/api/students',      require('./routes/students'));
 app.use('/api/notices',       require('./routes/notices'));
 app.use('/api/users',         require('./routes/users'));
+app.use('/api/reports',       require('./routes/reports'));
 
 app.get('/api', (req, res) =>
   res.json({
-    message: 'BusTrack University API is running',
+    message: 'BusTrack School API is running',
     routes: ['/api/auth', '/api/buses', '/api/drivers', '/api/routes', '/api/registrations', '/api/settings', '/api/students', '/api/notices']
   })
 );
 
 app.get('/', (req, res) =>
-  res.json({ message: 'BusTrack University API ✅', version: '2.0' }));
+  res.json({ message: 'BusTrack School API', version: '2.0' }));
 
 // ── Socket.io — Real-Time GPS Tracking ──────────────────────────────────────
 const activeBuses = {}; // { busId: { latitude, longitude, speed, timestamp } }
@@ -123,7 +125,7 @@ io.on('connection', (socket) => {
 
 // ── MongoDB + Start ──────────────────────────────────────────────────────────
 const PORT      = process.env.PORT     || 3000;
-const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/bustrack_university';
+const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/bustrack_school';
 
 mongoose.connect(MONGO_URI)
   .then(() => {

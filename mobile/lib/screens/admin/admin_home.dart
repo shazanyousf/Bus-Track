@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import '../login_screen.dart';
 import '../account_screen.dart';
 import 'admin_buses_screen.dart';
@@ -9,7 +11,6 @@ import 'admin_requests_screen.dart';
 import 'admin_drivers_screen.dart';
 import 'admin_routes_screen.dart';
 import 'admin_users_screen.dart';
-import 'admin_settings_screen.dart';
 import '../shared/notices_screen.dart';
 
 class AdminHome extends StatefulWidget {
@@ -29,16 +30,15 @@ class _AdminHomeState extends State<AdminHome> {
         onOpenBuses: () => setState(() => _currentIndex = 2),
         onOpenRequests: () => setState(() => _currentIndex = 3),
         onOpenDrivers: () => setState(() => _currentIndex = 4),
-        onManageDepartments: () => setState(() => _currentIndex = 6),
-        onManageNotices: () => setState(() => _currentIndex = 5),
+        onManageNotices: () => setState(() => _currentIndex = 6),
+        onDownloadReports: () => _downloadReports(),
       ),
-      const AdminRoutesScreen(),
-      const AdminBusesScreen(),
-      const AdminRequestsScreen(),
-      const AdminDriversScreen(),
-      const AdminUsersScreen(),
-      const NoticesScreen(adminMode: true),
-      const AdminSettingsScreen(),
+      AdminRoutesScreen(onBack: () => setState(() => _currentIndex = 0)),
+      AdminBusesScreen(onBack: () => setState(() => _currentIndex = 0)),
+      AdminRequestsScreen(onBack: () => setState(() => _currentIndex = 0)),
+      AdminDriversScreen(onBack: () => setState(() => _currentIndex = 0)),
+      AdminUsersScreen(onBack: () => setState(() => _currentIndex = 0)),
+      NoticesScreen(adminMode: true, onBack: () => setState(() => _currentIndex = 0)),
     ];
 
     return Scaffold(
@@ -71,11 +71,61 @@ class _AdminHomeState extends State<AdminHome> {
             BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Drivers'),
             BottomNavigationBarItem(icon: Icon(Icons.group_rounded), label: 'Users'),
             BottomNavigationBarItem(icon: Icon(Icons.campaign_rounded), label: 'Notices'),
-            BottomNavigationBarItem(icon: Icon(Icons.account_tree_rounded), label: 'Departments'),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _downloadReports() async {
+    final format = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF16213E),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text('Download Reports', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              subtitle: Text('Choose a file format', style: TextStyle(color: Color(0xFF8892A4))),
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_chart_rounded, color: Color(0xFF2ECC71)),
+              title: const Text('Excel (.xlsx)', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context, 'xlsx'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.description_rounded, color: Color(0xFF4A9EFF)),
+              title: const Text('CSV (.csv)', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context, 'csv'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (format == null || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final token = context.read<AuthService>().token;
+      if (token == null) throw Exception('You are not signed in');
+      final isExcel = format == 'xlsx';
+      final bytes = isExcel
+          ? await ApiService.downloadRegistrationReport(token)
+          : await ApiService.downloadRegistrationReportCsv(token);
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save ${isExcel ? 'Excel' : 'CSV'} registration report',
+        fileName: 'bustrack-registrations.${isExcel ? 'xlsx' : 'csv'}',
+        bytes: bytes,
+      );
+      if (path != null && mounted) {
+        messenger.showSnackBar(SnackBar(content: Text('${isExcel ? 'Excel' : 'CSV'} report downloaded successfully')));
+      }
+    } catch (error) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text('Could not download report: $error')));
+      }
+    }
   }
 }
 
@@ -84,21 +134,22 @@ class _AdminDashboard extends StatefulWidget {
     required this.onOpenBuses,
     required this.onOpenRequests,
     required this.onOpenDrivers,
-    required this.onManageDepartments,
     required this.onManageNotices,
+    required this.onDownloadReports,
   });
 
   final VoidCallback onOpenBuses;
   final VoidCallback onOpenRequests;
   final VoidCallback onOpenDrivers;
-  final VoidCallback onManageDepartments;
   final VoidCallback onManageNotices;
+  final VoidCallback onDownloadReports;
 
   @override
   State<_AdminDashboard> createState() => _AdminDashboardState();
 }
 
 class _AdminDashboardState extends State<_AdminDashboard> {
+    final SocketService _socket = SocketService();
   List _buses         = [];
   List _registrations = [];
   List _drivers       = [];
@@ -107,7 +158,17 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   @override
   void initState() {
     super.initState();
+    _socket.connect();
+    _socket.listenToProfileUpdates((_) {
+      if (mounted) _load();
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _socket.stopListeningToProfileUpdates();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -317,7 +378,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
 
                 const _SectionHeader(
                   title: 'Management',
-                  subtitle: 'Fast actions for notices and departments',
+                  subtitle: 'Fast actions for school transport',
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -333,10 +394,10 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _QuickActionCard(
-                        icon: Icons.account_tree_rounded,
-                        label: 'Manage Departments',
-                        color: const Color(0xFF4A9EFF),
-                        onTap: widget.onManageDepartments,
+                        icon: Icons.download_rounded,
+                        label: 'Download Reports',
+                        color: const Color(0xFF2ECC71),
+                        onTap: widget.onDownloadReports,
                       ),
                     ),
                   ],

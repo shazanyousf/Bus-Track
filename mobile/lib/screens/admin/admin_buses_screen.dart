@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 
 class AdminBusesScreen extends StatefulWidget {
-  const AdminBusesScreen({super.key});
+  const AdminBusesScreen({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<AdminBusesScreen> createState() => _AdminBusesScreenState();
 }
 
 class _AdminBusesScreenState extends State<AdminBusesScreen> {
+  final SocketService _socket = SocketService();
   List _buses   = [];
   List _routes  = [];
   List _drivers = [];
@@ -19,7 +23,17 @@ class _AdminBusesScreenState extends State<AdminBusesScreen> {
   @override
   void initState() {
     super.initState();
+    _socket.connect();
+    _socket.listenToProfileUpdates((_) {
+      if (mounted) _load();
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _socket.stopListeningToProfileUpdates();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -240,6 +254,12 @@ class _AdminBusesScreenState extends State<AdminBusesScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                if (widget.onBack != null)
+                  IconButton(
+                    onPressed: widget.onBack,
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    tooltip: 'Back to dashboard',
+                  ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

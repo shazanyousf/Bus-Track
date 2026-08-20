@@ -12,9 +12,11 @@ class NoticesScreen extends StatefulWidget {
   const NoticesScreen({
     super.key,
     this.adminMode = false,
+    this.onBack,
   });
 
   final bool adminMode;
+  final VoidCallback? onBack;
 
   @override
   State<NoticesScreen> createState() => _NoticesScreenState();
@@ -335,6 +337,13 @@ class _NoticesScreenState extends State<NoticesScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F0F1A),
         elevation: 0,
+        leading: widget.onBack == null
+            ? null
+            : IconButton(
+                onPressed: widget.onBack,
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: 'Back to dashboard',
+              ),
         title: Text(widget.adminMode ? 'Notice Board (Admin)' : 'Notice Board'),
       ),
       floatingActionButton: widget.adminMode

@@ -31,8 +31,7 @@ router.post('/', auth, async (req, res) => {
     const studentData = {
       name: req.body.studentData.name,
       studentId: req.body.studentData.studentId,
-      department: req.body.studentData.department,
-      semester: req.body.studentData.semester,
+      class: req.body.studentData.class,
       phone: req.body.studentData.phone,
       parentId: req.user.id
     };
@@ -44,8 +43,7 @@ router.post('/', auth, async (req, res) => {
 
     if (student) {
       student.name = studentData.name;
-      student.department = studentData.department;
-      student.semester = studentData.semester;
+      student.class = studentData.class;
       student.phone = studentData.phone;
       await student.save();
     } else {
@@ -86,23 +84,32 @@ router.post('/', auth, async (req, res) => {
 router.put('/:id/status', auth, auth.adminOnly, async (req, res) => {
   try {
     const { status, remarks } = req.body;
-    const reg = await Registration.findById(req.params.id).populate('busId');
+    const reg = await Registration.findById(req.params.id)
+      .populate('busId')
+      .populate('studentId');
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
 
     const previousStatus = reg.status;
     const bus = reg.busId;
 
     if (status === 'approved' && previousStatus !== 'approved') {
-      if (bus && bus.availableSeats <= 0) {
-        return res.status(400).json({ message: 'No seats available for this bus' });
-      }
       if (bus) {
-        await Bus.findByIdAndUpdate(bus._id, { $inc: { availableSeats: -1 } });
+        const updatedBus = await Bus.findOneAndUpdate(
+          { _id: bus._id, availableSeats: { $gt: 0 } },
+          { $inc: { availableSeats: -1 } },
+          { new: true },
+        );
+        if (!updatedBus) {
+          return res.status(400).json({ message: 'No seats available for this bus' });
+        }
       }
     }
 
     if (previousStatus === 'approved' && status !== 'approved' && bus) {
-      await Bus.findByIdAndUpdate(bus._id, { $inc: { availableSeats: 1 } });
+      await Bus.findOneAndUpdate(
+        { _id: bus._id, availableSeats: { $lt: bus.totalSeats } },
+        { $inc: { availableSeats: 1 } },
+      );
     }
 
     reg.status = status;
@@ -110,6 +117,13 @@ router.put('/:id/status', auth, auth.adminOnly, async (req, res) => {
     reg.reviewedBy = req.user.id;
     reg.reviewedAt = new Date();
     await reg.save();
+
+    req.app.get('io')?.emit('registration:updated', {
+      registrationId: reg._id.toString(),
+      parentId: reg.parentId.toString(),
+      status: reg.status,
+      studentName: reg.studentId?.name || 'Student',
+    });
 
     const populated = await Registration.findById(reg._id)
       .populate('studentId')

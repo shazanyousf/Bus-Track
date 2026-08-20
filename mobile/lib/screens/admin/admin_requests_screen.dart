@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 
 class AdminRequestsScreen extends StatefulWidget {
-  const AdminRequestsScreen({super.key});
+  const AdminRequestsScreen({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<AdminRequestsScreen> createState() => _AdminRequestsScreenState();
 }
 
 class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
+  final SocketService _socket = SocketService();
   List _requests = [];
   bool _loading  = true;
   String _filter = 'all';
@@ -18,7 +22,17 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
   @override
   void initState() {
     super.initState();
+    _socket.connect();
+    _socket.listenToProfileUpdates((_) {
+      if (mounted) _load();
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _socket.stopListeningToProfileUpdates();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -125,6 +139,15 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (widget.onBack != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      onPressed: widget.onBack,
+                      icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                      tooltip: 'Back to dashboard',
+                    ),
+                  ),
                 const Text('Registration Requests',
                     style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
                 Text(
@@ -191,6 +214,7 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
                                   ? _safeMap(reg['routeId'])
                                   : _safeMap(bus['routeId']);
                               final parent = _safeMap(reg['parentId']);
+                              final student = _safeMap(reg['studentId']);
                               final status = reg['status']  as String? ?? 'pending';
 
                               Color sc = status == 'approved'
@@ -246,6 +270,42 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
                                           ),
                                         ),
                                       ],
+                                    ),
+                                    const SizedBox(height: 14),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0F0F1A),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: const Color(0xFF2A3A5C)),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('Student Details',
+                                              style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 12)),
+                                          const SizedBox(height: 8),
+                                          Wrap(
+                                            spacing: 16,
+                                            runSpacing: 6,
+                                            children: [
+                                              _StudentDetail(
+                                                  label: 'Name',
+                                                  value: student['name']?.toString() ?? 'N/A'),
+                                              _StudentDetail(
+                                                  label: 'Roll No.',
+                                                  value: student['studentId']?.toString() ?? 'N/A'),
+                                              _StudentDetail(
+                                                  label: 'Class',
+                                                  value: student['class']?.toString() ?? 'N/A'),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                     const SizedBox(height: 12),
                                     Row(
@@ -342,6 +402,32 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
                             },
                           ),
                   ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StudentDetail extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StudentDetail({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: const TextStyle(color: Color(0xFF8892A4), fontSize: 11),
+          ),
+          TextSpan(
+            text: value,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
           ),
         ],
       ),

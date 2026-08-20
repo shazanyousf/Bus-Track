@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const User = require('../models/User');
+const Driver = require('../models/Driver');
 const auth = require('../middleware/auth');
 
 // List all users (admin only)
@@ -13,12 +14,20 @@ router.get('/', auth, auth.adminOnly, async (req, res) => {
 });
 
 // Update user (admin only)
-router.put('/:id', auth, auth.adminOnly, async (req, res) => {
+router.put('/:id([0-9a-fA-F]{24})', auth, auth.adminOnly, async (req, res) => {
   try {
     const allowed = ['name', 'email', 'phone', 'role', 'busId', 'emailVerified'];
     const update = {};
     for (const k of allowed) if (k in req.body) update[k] = req.body[k];
+    const previousUser = await User.findById(req.params.id).select('name phone role');
     const user = await User.findByIdAndUpdate(req.params.id, update, { new: true }).select('-password -verificationCode -resetCode');
+    if (user?.role === 'driver' && previousUser?.phone) {
+      await Driver.findOneAndUpdate(
+        { phone: previousUser.phone },
+        { name: user.name, phone: user.phone },
+      );
+    }
+    req.app.get('io')?.emit('profile:updated', { userId: user._id.toString(), role: user.role });
     res.json(user);
   } catch (e) {
     res.status(400).json({ message: e.message });
@@ -26,7 +35,7 @@ router.put('/:id', auth, auth.adminOnly, async (req, res) => {
 });
 
 // Delete user (admin only)
-router.delete('/:id', auth, auth.adminOnly, async (req, res) => {
+router.delete('/:id([0-9a-fA-F]{24})', auth, auth.adminOnly, async (req, res) => {
   try {
     await User.findByIdAndDelete(req.params.id);
     res.json({ message: 'User deleted' });
@@ -53,7 +62,15 @@ router.put('/me', auth, async (req, res) => {
     const allowed = ['name', 'email', 'phone'];
     const update = {};
     for (const k of allowed) if (k in req.body) update[k] = req.body[k];
+    const previousUser = await User.findById(req.user.id).select('name phone role');
     const user = await User.findByIdAndUpdate(req.user.id, update, { new: true }).select('-password -verificationCode -resetCode');
+    if (user?.role === 'driver' && previousUser?.phone) {
+      await Driver.findOneAndUpdate(
+        { phone: previousUser.phone },
+        { name: user.name, phone: user.phone },
+      );
+    }
+    req.app.get('io')?.emit('profile:updated', { userId: user._id.toString(), role: user.role });
     res.json(user);
   } catch (e) {
     res.status(400).json({ message: e.message });

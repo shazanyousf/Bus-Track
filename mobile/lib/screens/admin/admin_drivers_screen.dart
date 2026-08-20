@@ -2,22 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 
 class AdminDriversScreen extends StatefulWidget {
-  const AdminDriversScreen({super.key});
+  const AdminDriversScreen({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<AdminDriversScreen> createState() => _AdminDriversScreenState();
 }
 
 class _AdminDriversScreenState extends State<AdminDriversScreen> {
+  final SocketService _socket = SocketService();
   List _drivers = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    _socket.connect();
+    _socket.listenToProfileUpdates((_) {
+      if (mounted) _load();
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _socket.stopListeningToProfileUpdates();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -231,6 +245,12 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                if (widget.onBack != null)
+                  IconButton(
+                    onPressed: widget.onBack,
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    tooltip: 'Back to dashboard',
+                  ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

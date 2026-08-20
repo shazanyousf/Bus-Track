@@ -4,7 +4,9 @@ import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 
 class AdminRoutesScreen extends StatefulWidget {
-  const AdminRoutesScreen({super.key});
+  const AdminRoutesScreen({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<AdminRoutesScreen> createState() => _AdminRoutesScreenState();
@@ -283,6 +285,13 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF16213E),
         elevation: 0,
+        leading: widget.onBack == null
+            ? null
+            : IconButton(
+                onPressed: widget.onBack,
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: 'Back to dashboard',
+              ),
         title: const Text('Manage Routes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
         actions: [
           Padding(

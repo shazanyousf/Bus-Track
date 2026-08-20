@@ -45,6 +45,9 @@ class _DriverHomeState extends State<DriverHome> {
   void initState() {
     super.initState();
     _socket.connect();
+    _socket.listenToProfileUpdates((_) {
+      if (mounted) _loadBuses();
+    });
     _loadBuses();
   }
 
@@ -154,6 +157,7 @@ class _DriverHomeState extends State<DriverHome> {
   }
 
   void _stopTracking() {
+    _socket.stopListeningToProfileUpdates();
     _posStream?.cancel();
     _posStream = null;
     _durationTimer?.cancel();

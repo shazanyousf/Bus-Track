@@ -1,23 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import '../../services/auth_service.dart';
 
 class AdminUsersScreen extends StatefulWidget {
-  const AdminUsersScreen({super.key});
+  const AdminUsersScreen({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<AdminUsersScreen> createState() => _AdminUsersScreenState();
 }
 
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
+  final SocketService _socket = SocketService();
   List _users = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    _socket.connect();
+    _socket.listenToProfileUpdates((_) {
+      if (mounted) _load();
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _socket.stopListeningToProfileUpdates();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -148,6 +162,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                if (widget.onBack != null)
+                  IconButton(
+                    onPressed: widget.onBack,
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    tooltip: 'Back to dashboard',
+                  ),
                 const Text('Manage Users', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
                 Text('${_users.length} users', style: const TextStyle(color: Color(0xFF8892A4)))
               ],

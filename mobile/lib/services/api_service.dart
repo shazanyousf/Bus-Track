@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
@@ -187,6 +188,20 @@ class ApiService {
         headers: headers(token)).timeout(_timeout);
     if (res.statusCode == 200) return jsonDecode(res.body);
     throw Exception('Failed to load registrations');
+  }
+
+  static Future<Uint8List> downloadRegistrationReport(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/reports/registrations.xlsx'),
+        headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return res.bodyBytes;
+    throw Exception('Failed to download registration report');
+  }
+
+  static Future<Uint8List> downloadRegistrationReportCsv(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/reports/registrations.csv'),
+        headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return res.bodyBytes;
+    throw Exception('Failed to download registration report');
   }
 
   static Future<Map> submitRegistration(String token, Map data) async {

@@ -1,6 +1,6 @@
 # BusTrack
 
-University transport tracking system with a Node.js backend and a Flutter mobile app.
+School transport tracking system with a Node.js backend and a Flutter mobile app.
 
 ## Overview
 
@@ -63,7 +63,7 @@ Create `backend/.env` with at least:
 
 ```env
 PORT=3000
-MONGODB_URI=mongodb://localhost:27017/bustrack_university
+MONGODB_URI=mongodb://localhost:27017/bustrack_school
 JWT_SECRET=bustrack_secret
 SMTP_HOST=
 SMTP_PORT=587
