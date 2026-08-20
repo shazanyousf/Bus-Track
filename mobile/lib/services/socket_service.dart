@@ -147,6 +147,16 @@ class SocketService {
     _socket?.off('registration:updated');
   }
 
+  void listenToPaymentReceived(void Function(Map<String, dynamic>) onUpdate) {
+    _socket?.on('payment:received', (data) {
+      if (data is Map) onUpdate(Map<String, dynamic>.from(data));
+    });
+  }
+
+  void stopListeningToPaymentReceived() {
+    _socket?.off('payment:received');
+  }
+
   /// Stop listening to a bus (call when leaving the tracking screen).
   void stopListening(String busId) {
     _socket?.off('bus:location:$busId');

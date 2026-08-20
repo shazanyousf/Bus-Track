@@ -18,6 +18,7 @@ const getRegistrations = () => Registration.find()
 const reportHeaders = [
   'Request Date', 'Student ID', 'Student Name', 'Class', 'Parent Name',
   'Parent Email', 'Bus Number', 'Route', 'Stop', 'Status', 'Reviewed At', 'Remarks',
+  'Payment Status', 'Payment Amount', 'Payment ID', 'Paid At', 'Assignment Status',
 ];
 
 const reportRows = (registrations) => registrations.map((registration) => [
@@ -33,6 +34,11 @@ const reportRows = (registrations) => registrations.map((registration) => [
   registration.status,
   registration.reviewedAt?.toISOString(),
   registration.remarks,
+  registration.paymentStatus,
+  registration.paymentAmount,
+  registration.paymentId,
+  registration.paidAt?.toISOString(),
+  registration.assignmentStatus,
 ]);
 
 router.get('/registrations.csv', auth, auth.adminOnly, async (req, res) => {
@@ -63,7 +69,7 @@ router.get('/registrations.xlsx', auth, auth.adminOnly, async (req, res) => {
     worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF16213E' } };
     worksheet.views = [{ state: 'frozen', ySplit: 1 }];
-    worksheet.autoFilter = { from: 'A1', to: 'L1' };
+    worksheet.autoFilter = { from: 'A1', to: 'Q1' };
     worksheet.columns.forEach((column) => { column.width = 18; });
     worksheet.getColumn(3).width = 24;
     worksheet.getColumn(5).width = 24;

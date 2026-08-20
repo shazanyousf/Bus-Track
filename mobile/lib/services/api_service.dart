@@ -232,6 +232,45 @@ class ApiService {
     return body;
   }
 
+  static Future<Map> payRegistration(String token, String id) async {
+    final res = await http.post(Uri.parse('$baseUrl/registrations/$id/payment/order'),
+        headers: headers(token)).timeout(_timeout);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      throw Exception(body['message'] ?? 'Failed to complete payment');
+    }
+    return body;
+  }
+
+  static Future<Map> verifyRegistrationPayment(String token, String id, {
+    required String paymentId,
+    required String orderId,
+    required String signature,
+  }) async {
+    final res = await http.post(Uri.parse('$baseUrl/registrations/$id/payment/verify'),
+        headers: headers(token), body: jsonEncode({
+          'razorpay_payment_id': paymentId,
+          'razorpay_order_id': orderId,
+          'razorpay_signature': signature,
+        })).timeout(_timeout);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      throw Exception(body['message'] ?? 'Payment verification failed');
+    }
+    return body;
+  }
+
+  static Future<Map> assignRegistration(String token, String id, String busId,
+      {String? routeId}) async {
+    final res = await http.put(Uri.parse('$baseUrl/registrations/$id/assignment'),
+        headers: headers(token), body: jsonEncode({'busId': busId, 'routeId': routeId})).timeout(_timeout);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      throw Exception(body['message'] ?? 'Failed to assign bus');
+    }
+    return body;
+  }
+
   // ── Students ─────────────────────────────────────────────
   static Future<List> getStudents(String token) async {
     final res = await http.get(Uri.parse('$baseUrl/students'),

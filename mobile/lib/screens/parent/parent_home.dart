@@ -36,12 +36,13 @@ class _ParentHomeState extends State<ParentHome> {
     });
     _socket.listenToRegistrationUpdates((update) {
       if (update['parentId']?.toString() != parentId) return;
+      final isPayment = update['event'] == 'payment';
       final status = update['status']?.toString() ?? 'updated';
       final studentName = update['studentName']?.toString() ?? 'Student';
       NotificationService.instance.show(
         id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        title: 'Registration $status',
-        body: '$studentName\'s bus registration was $status.',
+        title: isPayment ? 'Payment Successful' : 'Registration $status',
+        body: isPayment ? 'Your transport fee payment was received.' : '$studentName\'s bus registration was $status.',
       );
       if (mounted) _loadData();
     });
@@ -71,7 +72,7 @@ class _ParentHomeState extends State<ParentHome> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
-    final approved = _registrations.where((r) => r['status'] == 'approved').toList();
+    final approved = _registrations.where((r) => r['status'] == 'active').toList();
 
     final pages = [
       _DashboardTab(

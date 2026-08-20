@@ -4,6 +4,8 @@ const cors       = require('cors');
 const http       = require('http');
 const path       = require('path');
 const { Server } = require('socket.io');
+const Bus = require('./models/Bus');
+const Registration = require('./models/Registration');
 require('dotenv').config();
 
 const app    = express();
@@ -127,9 +129,28 @@ io.on('connection', (socket) => {
 const PORT      = process.env.PORT     || 3000;
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/bustrack_school';
 
+async function reconcileBusSeats() {
+  const assignments = await Registration.aggregate([
+    { $match: { status: 'active', assignmentStatus: 'ASSIGNED', busId: { $ne: null } } },
+    { $group: { _id: '$busId', assigned: { $sum: 1 } } },
+  ]);
+  const assignedByBus = new Map(assignments.map((entry) => [entry._id.toString(), entry.assigned]));
+  const buses = await Bus.find({}, 'totalSeats availableSeats');
+  await Promise.all(buses.map((bus) => {
+    const assigned = assignedByBus.get(bus._id.toString()) || 0;
+    const availableSeats = Math.max(bus.totalSeats - assigned, 0);
+    if (bus.availableSeats === availableSeats) return null;
+    return Bus.updateOne({ _id: bus._id }, { $set: { availableSeats } });
+  }));
+  console.log(`🪑 Reconciled seats for ${buses.length} bus(es)`);
+}
+
 mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected');
+    return reconcileBusSeats();
+  })
+  .then(() => {
     
     server.listen(PORT, '0.0.0.0', () =>
       console.log(`🚀 Server running  →  http://0.0.0.0:${PORT} (accessible from Android emulator at 10.0.2.2:${PORT})`));

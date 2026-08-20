@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 
@@ -11,13 +12,25 @@ class MyRegistrationsScreen extends StatefulWidget {
 }
 
 class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
+  final Razorpay _razorpay = Razorpay();
   List _registrations = [];
   bool _loading = true;
+  bool _paymentLoading = false;
+  Map? _paymentRegistration;
 
   @override
   void initState() {
     super.initState();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -31,9 +44,68 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
     }
   }
 
+  Future<void> _pay(Map registration) async {
+    try {
+      setState(() {
+        _paymentLoading = true;
+        _paymentRegistration = registration;
+      });
+      final order = await ApiService.payRegistration(
+          context.read<AuthService>().token!, registration['_id']);
+      _razorpay.open({
+        'key': order['keyId'],
+        'amount': order['amount'],
+        'currency': 'INR',
+        'name': 'BusTrack University',
+        'description': 'Transport Fee',
+        'order_id': order['orderId'],
+        'prefill': {'name': context.read<AuthService>().user?['name'] ?? ''},
+        'theme': {'color': '#FF6B35'},
+      });
+    } catch (error) {
+      _paymentLoading = false;
+      _paymentRegistration = null;
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Payment failed: $error')));
+    }
+  }
+
+  Future<void> _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    final registration = _paymentRegistration;
+    if (registration == null) return;
+    try {
+      await ApiService.verifyRegistrationPayment(
+        context.read<AuthService>().token!, registration['_id'],
+        paymentId: response.paymentId ?? '',
+        orderId: response.orderId ?? '',
+        signature: response.signature ?? '',
+      );
+      await _load();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment Successful\nTransaction ID: ${response.paymentId}')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment verification failed: $error')));
+    } finally {
+      if (mounted) setState(() { _paymentLoading = false; _paymentRegistration = null; });
+    }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    _paymentLoading = false;
+    _paymentRegistration = null;
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Payment failed or cancelled: ${response.message ?? 'Please try again'}')));
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('External wallet selected: ${response.walletName ?? 'wallet'}')));
+  }
+
   Color _statusColor(String s) {
     switch (s) {
       case 'approved':  return const Color(0xFF2ECC71);
+      case 'active':    return const Color(0xFF2ECC71);
       case 'rejected':  return const Color(0xFFE74C3C);
       case 'cancelled': return const Color(0xFFF7C948);
       default:          return const Color(0xFFF7C948);
@@ -88,6 +160,7 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                                   : _safeMap(bus['routeId']);
                               final driver = _safeMap(bus['driverId']);
                               final status = reg['status'] as String? ?? 'pending';
+                              final paymentStatus = reg['paymentStatus'] as String? ?? 'PENDING';
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 14),
                                 padding: const EdgeInsets.all(18),
@@ -130,6 +203,24 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                                     Text(route['routeName'] ?? 'No route',
                                         style: const TextStyle(
                                             color: Color(0xFF8892A4), fontSize: 13)),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Icon(paymentStatus == 'PAID' ? Icons.check_circle : Icons.pending,
+                                            size: 16, color: paymentStatus == 'PAID' ? const Color(0xFF2ECC71) : const Color(0xFFF7C948)),
+                                        const SizedBox(width: 6),
+                                        Text(paymentStatus == 'PAID' ? 'Payment Successful' : 'Payment Pending',
+                                            style: TextStyle(color: paymentStatus == 'PAID' ? const Color(0xFF2ECC71) : const Color(0xFFF7C948), fontSize: 12, fontWeight: FontWeight.w700)),
+                                        const Spacer(),
+                                        if (status == 'approved' && paymentStatus != 'PAID')
+                                          TextButton(
+                                            onPressed: _paymentLoading ? null : () => _pay(reg),
+                                            child: _paymentLoading && identical(_paymentRegistration, reg)
+                                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                                : const Text('Pay ₹1,500'),
+                                          ),
+                                      ],
+                                    ),
                                     const SizedBox(height: 8),
                                     const Divider(color: Color(0xFF2A3A5C)),
                                     const SizedBox(height: 8),

@@ -21,6 +21,7 @@ dependencies:
   url_launcher: ^6.3.2
   file_picker: ^8.1.2
   flutter_local_notifications: ^17.2.3
+  razorpay_flutter: ^1.4.5
 
 dev_dependencies:
   flutter_test:

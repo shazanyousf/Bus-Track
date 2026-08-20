@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
+import '../../services/notification_service.dart';
 
 class AdminRequestsScreen extends StatefulWidget {
   const AdminRequestsScreen({super.key, this.onBack});
@@ -26,13 +27,60 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
     _socket.listenToProfileUpdates((_) {
       if (mounted) _load();
     });
+    _socket.listenToPaymentReceived((_) {
+      NotificationService.instance.show(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title: 'Payment Received',
+        body: 'A parent completed a transport fee payment.',
+      );
+      if (mounted) _load();
+    });
     _load();
   }
 
   @override
   void dispose() {
     _socket.stopListeningToProfileUpdates();
+    _socket.stopListeningToPaymentReceived();
     super.dispose();
+  }
+
+  Future<void> _assignBus(Map registration) async {
+    final buses = await ApiService.getBuses();
+    if (!mounted) return;
+    final selectedBusId = await showDialog<String>(
+      context: context,
+      builder: (_) {
+        String? selected;
+        return StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF16213E),
+          title: const Text('Assign Bus', style: TextStyle(color: Colors.white)),
+          content: DropdownButtonFormField<String>(
+            value: selected,
+            dropdownColor: const Color(0xFF16213E),
+            decoration: const InputDecoration(labelText: 'Bus', labelStyle: TextStyle(color: Color(0xFF8892A4))),
+            items: buses.map((bus) => DropdownMenuItem<String>(
+              value: bus['_id']?.toString(),
+              child: Text('${bus['busNumber']} (${bus['availableSeats']} seats)', style: const TextStyle(color: Colors.white)),
+            )).toList(),
+            onChanged: (value) => setDialogState(() => selected = value),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(onPressed: selected == null ? null : () => Navigator.pop(context, selected), child: const Text('Assign Bus')),
+          ],
+        ));
+      },
+    );
+    if (selectedBusId == null || !mounted) return;
+    try {
+      await ApiService.assignRegistration(context.read<AuthService>().token!, registration['_id'].toString(), selectedBusId,
+          routeId: registration['routeId']?['_id']?.toString());
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bus assigned successfully')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Assignment failed: $error')));
+    }
   }
 
   Future<void> _load() async {
@@ -158,7 +206,7 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
                   height: 34,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
-                    children: ['all', 'pending', 'approved', 'rejected', 'cancelled']
+                    children: ['all', 'pending', 'approved', 'active', 'rejected', 'cancelled']
                         .map((f) => GestureDetector(
                               onTap: () => setState(() => _filter = f),
                               child: Container(
@@ -216,6 +264,7 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
                               final parent = _safeMap(reg['parentId']);
                               final student = _safeMap(reg['studentId']);
                               final status = reg['status']  as String? ?? 'pending';
+                              final paymentStatus = reg['paymentStatus'] as String? ?? 'PENDING';
 
                               Color sc = status == 'approved'
                                   ? const Color(0xFF2ECC71)
@@ -317,6 +366,16 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
                                         _Tag(
                                             icon: Icons.route_rounded,
                                             text: route['routeName'] ?? 'N/A'),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Text(paymentStatus == 'PAID' ? 'Payment: PAID ✓' : 'Payment: PENDING',
+                                            style: TextStyle(color: paymentStatus == 'PAID' ? const Color(0xFF2ECC71) : const Color(0xFFF7C948), fontSize: 12, fontWeight: FontWeight.w700)),
+                                        const Spacer(),
+                                        if (status == 'approved' && paymentStatus == 'PAID')
+                                          TextButton.icon(onPressed: () => _assignBus(reg), icon: const Icon(Icons.directions_bus, size: 16), label: const Text('Assign Bus')),
                                       ],
                                     ),
                                     if (status == 'pending' || status == 'approved') ...[
