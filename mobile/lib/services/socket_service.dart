@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -90,7 +91,7 @@ class SocketService {
       print('DRIVER LOCATION SKIPPED: socket is not connected');
       return;
     }
-    print('DRIVER -> SOCKET LOCATION busId=$busId tripId=$tripId lat=$latitude lng=$longitude');
+    print('[DRIVER SOCKET EMIT] event=driver:location busId=$busId tripId=$tripId latitude=$latitude longitude=$longitude');
     _socket!.emit('driver:location', {
       'busId': busId,
       'tripId': tripId,
@@ -103,12 +104,22 @@ class SocketService {
     });
   }
 
-  void emitTripStarted({required String busId, required String tripId}) {
+  Future<Map<String, dynamic>?> emitTripStarted({required String busId, required String tripId}) async {
     if (!(_socket?.connected ?? false)) {
       print('TRIP START SKIPPED: socket is not connected');
-      return;
+      return null;
     }
-    _socket?.emit('driver:trip:start', {'busId': busId, 'tripId': tripId});
+    final completer = Completer<Map<String, dynamic>?>();
+    _socket!.emitWithAck(
+      'driver:trip:start',
+      {'busId': busId, 'tripId': tripId},
+      ack: (data) {
+        if (!completer.isCompleted) {
+          completer.complete(data is Map ? Map<String, dynamic>.from(data) : null);
+        }
+      },
+    );
+    return completer.future.timeout(const Duration(seconds: 10), onTimeout: () => null);
   }
 
   void emitTripCompleted({required String busId, required String tripId}) {

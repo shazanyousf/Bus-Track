@@ -14,7 +14,8 @@ const busSchema = new mongoose.Schema({
   tripCompletedAt: { type: Date, default: null },
   currentLocation: {
     latitude:  { type: Number, default: 0 },
-    longitude: { type: Number, default: 0 }
+    longitude: { type: Number, default: 0 },
+    updatedAt: { type: Date, default: null }
   }
 }, { timestamps: true });
 

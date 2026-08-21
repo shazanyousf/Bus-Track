@@ -127,9 +127,31 @@ class _DriverHomeState extends State<DriverHome> {
       return;
     }
 
+    final requestedTripId = 'trip-${busId}-${DateTime.now().millisecondsSinceEpoch}';
+    final startResponse = await _socket.emitTripStarted(
+      busId: busId,
+      tripId: requestedTripId,
+    );
+    if (!mounted) return;
+    if (startResponse == null || startResponse['success'] != true) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(startResponse?['message']?.toString() ?? 'Trip start was rejected'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+
+    final acceptedTripId = startResponse['tripId']?.toString();
+    if (acceptedTripId == null || acceptedTripId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Tracking server did not return an active trip ID'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+    _tripId = acceptedTripId;
+    debugPrint('[DRIVER ACTIVE TRIP] tripId=$_tripId busId=$busId');
     setState(() => _isTracking = true);
-    _tripId = 'trip-${busId}-${DateTime.now().millisecondsSinceEpoch}';
-    _socket.emitTripStarted(busId: busId, tripId: _tripId!);
 
     // Start duration timer
     _duration = 0;
@@ -145,8 +167,10 @@ class _DriverHomeState extends State<DriverHome> {
       ),
     ).listen((Position pos) async {
       final newPos = LatLng(pos.latitude, pos.longitude);
-        final currentTripId = _tripId;
-        if (currentTripId == null) return;
+      final currentTripId = _tripId;
+      if (!_isTracking || currentTripId == null) return;
+
+      debugPrint('[DRIVER GPS] tripId=$currentTripId busId=$busId latitude=${pos.latitude} longitude=${pos.longitude}');
 
       // Emit to server → all parents watching this bus get updated
       _socket.emitLocation(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/socket_service.dart';
 import '../account_screen.dart';
 import '../login_screen.dart';
 
@@ -26,6 +27,7 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
+  final SocketService _socket = SocketService();
   Map<String, dynamic>? _stats;
   bool _loading = true;
   String? _error;
@@ -33,7 +35,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void initState() {
     super.initState();
+    _socket.connect(token: context.read<AuthService>().token);
+    _socket.listenToTripStarted((_) => _load());
+    _socket.listenToTripCompleted((_) => _load());
     _load();
+  }
+
+  @override
+  void dispose() {
+    _socket.stopListeningToTripEvents();
+    super.dispose();
   }
 
   Future<void> _load() async {

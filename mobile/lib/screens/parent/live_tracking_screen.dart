@@ -29,6 +29,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   bool _connected = false;
   bool _tripCompleted = false;
   bool _tripStartedBySocket = false;
+  bool _hasSocketLocation = false;
   String? _tripId;
   Map<String, dynamic>? _lastAlert;
 
@@ -144,6 +145,22 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       });
     });
 
+    _socket.listenToTripCompleted((data) {
+      if (data['busId']?.toString() != busId) return;
+      if (!mounted) return;
+      final completedTripId = data['tripId']?.toString();
+      if (_tripId != null && completedTripId != null && completedTripId != _tripId) return;
+      debugPrint('[${widget.adminMode ? 'ADMIN' : 'PARENT'} TRIP COMPLETED] busId=$busId tripId=${completedTripId ?? 'none'}');
+      setState(() {
+        _tripCompleted = true;
+        _tripStartedBySocket = false;
+        _tripId = null;
+        _connected = false;
+        _speed = 0;
+        _lastUpdate = 'Trip completed';
+      });
+    });
+
     _socket.listenToBusAlerts(busId, (alert) {
       if (!mounted) return;
       setState(() => _lastAlert = alert);
@@ -158,25 +175,27 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       );
     });
 
-    void applyLocation(Map<String, dynamic> data) {
+    void applyLocation(Map<String, dynamic> data, {bool fromSocket = true}) {
       final incomingTripId = data['tripId']?.toString();
       if (_tripCompleted) return;
       if (_tripId == null && incomingTripId != null && incomingTripId.isNotEmpty) {
         _tripId = incomingTripId;
       }
-      if (_tripId != null && incomingTripId != null && incomingTripId != _tripId) {
-        debugPrint('PARENT TRIP UPDATED busId=$busId oldTripId=$_tripId newTripId=$incomingTripId');
-        _tripId = incomingTripId;
-        _tripCompleted = false;
-      }
+      if (_tripId != null && incomingTripId != null && incomingTripId != _tripId) return;
       final lat = ((data['lat'] ?? data['latitude']) as num?)?.toDouble();
       final lng = ((data['lng'] ?? data['longitude']) as num?)?.toDouble();
       final speed = (data['speed'] as num?)?.toDouble() ?? 0;
 
-      if (lat == null || lng == null) return;
+      if (lat == null || lng == null ||
+          !lat.isFinite || !lng.isFinite ||
+          lat < -90 || lat > 90 || lng < -180 || lng > 180 ||
+          (lat == 0 && lng == 0)) return;
 
       final newPos = LatLng(lat, lng);
-      debugPrint('PARENT LOCATION RECEIVED busId=$busId tripId=${incomingTripId ?? 'none'} lat=$lat lng=$lng');
+      if (fromSocket) {
+        _hasSocketLocation = true;
+        debugPrint('[${widget.adminMode ? 'ADMIN' : 'PARENT'} LOCATION RECEIVED] busId=$busId tripId=${incomingTripId ?? 'none'} latitude=$lat longitude=$lng');
+      }
 
       setState(() {
         _busPosition = newPos;
@@ -216,7 +235,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       if (!mounted) return;
       final activeTripId = activeTrip['tripId']?.toString();
       if (activeTripId == null || activeTripId.isEmpty) throw Exception('Active trip has no tripId');
-      if (!_tripStartedBySocket) {
+      if (!_tripStartedBySocket && !_hasSocketLocation) {
         setState(() {
           _tripId = activeTripId;
           _tripCompleted = false;
@@ -230,12 +249,12 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       if (fallbackLat != null &&
           fallbackLng != null &&
           (fallbackLat != 0 || fallbackLng != 0)) {
-        applyLocation({
+        if (!_hasSocketLocation) applyLocation({
           'tripId': activeTripId,
           'latitude': fallbackLat,
           'longitude': fallbackLng,
           'speed': 0,
-        });
+        }, fromSocket: false);
       }
     } catch (_) {
       if (!mounted) return;
@@ -250,18 +269,6 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       }
     }
     await _socket.requestBusLocation(busId);
-    _socket.listenToTripCompleted((data) {
-      if (data['busId']?.toString() != busId) return;
-      if (!mounted) return;
-      setState(() {
-        _tripCompleted = true;
-        _tripStartedBySocket = false;
-        _tripId = null;
-        _connected = false;
-        _speed = 0;
-        _lastUpdate = 'Trip completed';
-      });
-    });
   }
 
   String _formatTime(String? iso) {
