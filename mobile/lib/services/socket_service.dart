@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -12,6 +13,12 @@ class SocketService {
 
   IO.Socket? _socket;
   IO.Socket? get socket => _socket;
+  Future<void> Function(Map<String, dynamic>)? _onSessionRevoked;
+  bool _connecting = false;
+
+  void setSessionRevokedHandler(Future<void> Function(Map<String, dynamic>) handler) {
+    _onSessionRevoked = handler;
+  }
 
   String get socketUrl {
     final envUrl = dotenv.env['SOCKET_URL'];
@@ -53,9 +60,9 @@ class SocketService {
 
   /// Call once when the app starts or the user logs in.
   void connect({String? token}) {
-    if (_socket != null && _socket!.connected) return;
+    if (_socket != null && (_socket!.connected || _connecting)) return;
 
-    _socket = IO.io(
+    final socket = IO.io(
       socketUrl,
       IO.OptionBuilder()
           .setTransports(['websocket'])
@@ -63,12 +70,41 @@ class SocketService {
           .disableAutoConnect()
           .build(),
     );
+    _socket = socket;
+    _connecting = true;
 
-    _socket!.connect();
+    socket.connect();
 
-    _socket!.onConnect((_) => print('✅ Socket connected'));
-    _socket!.onDisconnect((_) => print('❌ Socket disconnected'));
-    _socket!.onError((e) => print('Socket error: $e'));
+    socket.onConnect((_) {
+      _connecting = false;
+      print('✅ Socket connected');
+      final session = _sessionFromToken(token);
+      print('[SESSION LOGIN] userId=${session['userId']} sessionId=${session['sessionId']} socketId=${socket.id}');
+    });
+    socket.onDisconnect((_) {
+      _connecting = false;
+      print('❌ Socket disconnected socketId=${socket.id}');
+    });
+    socket.onError((e) => print('Socket error: $e'));
+    socket.on('session:revoked', (data) async {
+      final event = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+      print('[SESSION REVOKE RECEIVED] eventUserId=${event['userId']} eventSessionId=${event['sessionId']}');
+      await _onSessionRevoked?.call(event);
+    });
+  }
+
+  Map<String, dynamic> _sessionFromToken(String? token) {
+    if (token == null) return {};
+    try {
+      final parts = token.split('.');
+      final payload = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      return {
+        'userId': payload['id'],
+        'sessionId': payload['sessionId'],
+      };
+    } catch (_) {
+      return {};
+    }
   }
 
   Future<bool> waitForConnection({Duration timeout = const Duration(seconds: 10)}) async {
@@ -235,5 +271,6 @@ class SocketService {
   void disconnect() {
     _socket?.disconnect();
     _socket = null;
+    _connecting = false;
   }
 }

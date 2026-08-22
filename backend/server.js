@@ -17,6 +17,9 @@ const io     = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 app.set('io', io);
+const activeSessions = new Map();
+app.set('activeSessions', activeSessions);
+app.set('activeSockets', new Map());
 
 app.use(cors());
 app.use(express.json());
@@ -69,10 +72,59 @@ io.on('connection', (socket) => {
   if (token) {
     try {
       socket.user = jwt.verify(token, process.env.JWT_SECRET || 'bustrack_secret');
+      console.log(`[SOCKET AUTH] socketId=${socket.id} userId=${socket.user.id} sessionId=${socket.user.sessionId}`);
     } catch (_) {
       socket.user = null;
+      console.log(`[SOCKET AUTH] socketId=${socket.id} invalid-token`);
     }
   }
+
+  const registerSocket = async () => {
+    if (!socket.user?.id || !socket.user.sessionId) return false;
+    const user = await User.findById(socket.user.id).select('_id sessionId').lean().catch(() => null);
+    if (!user || user.sessionId !== socket.user.sessionId) {
+      socket.emit('session:revoked', {
+        userId: socket.user.id.toString(),
+        sessionId: socket.user.sessionId,
+        message: 'Your account was signed in on another device.',
+      });
+      socket.disconnect(true);
+      return false;
+    }
+    const userId = socket.user.id.toString();
+    const current = { userId, sessionId: socket.user.sessionId, socketId: socket.id, socket };
+    const previous = activeSessions.get(userId);
+    if (previous && previous.socketId !== socket.id && previous.sessionId !== current.sessionId) {
+      previous.socket.emit('session:revoked', {
+        userId: previous.userId,
+        sessionId: previous.sessionId,
+        message: 'Your account was signed in on another device.',
+      });
+      console.log(`[SESSION REVOKE SENT] userId=${previous.userId} sessionId=${previous.sessionId} socketId=${previous.socketId}`);
+      setTimeout(() => previous.socket.disconnect(true), 100);
+    }
+    activeSessions.set(userId, current);
+    console.log(`[ACTIVE SESSION AFTER REPLACEMENT] userId=${userId} sessionId=${current.sessionId} socketId=${current.socketId}`);
+    console.log(`[SESSION LOGIN] userId=${socket.user.id} sessionId=${socket.user.sessionId} socketId=${socket.id}`);
+    return true;
+  };
+
+  const currentSession = async () => {
+    if (!socket.user?.id || !socket.user.sessionId) return false;
+    const user = await User.findById(socket.user.id).select('_id sessionId').lean().catch(() => null);
+    if (!user || user.sessionId !== socket.user.sessionId) {
+      socket.emit('session:revoked', {
+        userId: socket.user.id.toString(),
+        sessionId: socket.user.sessionId,
+        message: 'Your account was signed in on another device.',
+      });
+      socket.disconnect(true);
+      return false;
+    }
+    return true;
+  };
+
+  registerSocket();
 
   const driverCanUseBus = async (busId) => {
     if (socket.user?.role !== 'driver') return { ok: false, reason: 'socket is not an authenticated driver' };
@@ -90,6 +142,7 @@ io.on('connection', (socket) => {
   // Driver sends their GPS location
   // Payload: { busId, latitude, longitude, speed }
  socket.on('driver:trip:start', async (data, acknowledge) => {
+  if (!await currentSession()) return;
   const respond = (payload) => {
     if (typeof acknowledge === 'function') acknowledge(payload);
     return payload;
@@ -153,6 +206,7 @@ io.on('connection', (socket) => {
 });
 
  socket.on('driver:trip:complete', async (data) => {
+  if (!await currentSession()) return;
   console.log('TRIP COMPLETE REQUEST', { driverId: socket.user?.id || 'anonymous', busId: data.busId, tripId: data.tripId });
   if (!data.busId || !data.tripId) return console.log('TRIP COMPLETE REJECTED: busId and tripId are required');
   const authorization = await driverCanUseBus(data.busId);
@@ -170,6 +224,7 @@ io.on('connection', (socket) => {
 });
 
  socket.on('driver:location', async (data) => {
+  if (!await currentSession()) return;
   const lat = Number(data.latitude ?? data.lat);
   const lng = Number(data.longitude ?? data.lng);
   console.log('[SERVER LOCATION RECEIVED]', { socketId: socket.id, driverId: socket.user?.id || 'anonymous', busId: data.busId, tripId: data.tripId || null, latitude: lat, longitude: lng });
@@ -258,7 +313,8 @@ io.on('connection', (socket) => {
 });
 
   // Driver issue / traffic update -> broadcast to all parents for this bus
-  socket.on('driver:alert', (data) => {
+  socket.on('driver:alert', async (data) => {
+    if (!await currentSession()) return;
     if (!data.busId || !data.message) return;
 
     const alertPayload = {
@@ -275,6 +331,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    const userId = socket.user?.id?.toString();
+    const storedSocketId = userId ? activeSessions.get(userId)?.socketId : null;
+    const cleanupAllowed = Boolean(userId && storedSocketId === socket.id);
+    console.log(`[OLD SOCKET CLEANUP] socketId=${socket.id} storedSocketId=${storedSocketId || 'none'} cleanupAllowed=${cleanupAllowed}`);
+    if (cleanupAllowed) activeSessions.delete(userId);
     console.log(`📴 Client disconnected: ${socket.id}`);
   });
 });

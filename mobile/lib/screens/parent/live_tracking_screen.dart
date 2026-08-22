@@ -30,6 +30,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   bool _tripCompleted = false;
   bool _tripStartedBySocket = false;
   bool _hasSocketLocation = false;
+  DateTime? _lastSocketLocationAt;
   String? _tripId;
   Map<String, dynamic>? _lastAlert;
 
@@ -194,6 +195,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       final newPos = LatLng(lat, lng);
       if (fromSocket) {
         _hasSocketLocation = true;
+        final timestamp = DateTime.tryParse(data['timestamp']?.toString() ?? '');
+        _lastSocketLocationAt = timestamp ?? DateTime.now();
         debugPrint('[${widget.adminMode ? 'ADMIN' : 'PARENT'} LOCATION RECEIVED] busId=$busId tripId=${incomingTripId ?? 'none'} latitude=$lat longitude=$lng');
       }
 
@@ -217,6 +220,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
             ),
           ),
         );
+        if (widget.adminMode) {
+          debugPrint('[ADMIN MARKER UPDATE] busId=$busId latitude=$lat longitude=$lng');
+        }
       });
 
       try {
@@ -249,7 +255,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       if (fallbackLat != null &&
           fallbackLng != null &&
           (fallbackLat != 0 || fallbackLng != 0)) {
-        if (!_hasSocketLocation) applyLocation({
+        final restTimestamp = DateTime.tryParse(currentLocation['updatedAt']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        if (!_hasSocketLocation && (_lastSocketLocationAt == null || restTimestamp.isAfter(_lastSocketLocationAt!))) applyLocation({
           'tripId': activeTripId,
           'latitude': fallbackLat,
           'longitude': fallbackLng,

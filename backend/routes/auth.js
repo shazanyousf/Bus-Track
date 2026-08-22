@@ -1,10 +1,12 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const User = require('../models/User');
+const auth = require('../middleware/auth');
 
 const sign = (user) => jwt.sign(
-  { id: user._id, role: user.role, name: user.name },
+  { id: user._id, role: user.role, name: user.name, sessionId: user.sessionId },
   process.env.JWT_SECRET || 'bustrack_secret',
   { expiresIn: '7d' }
 );
@@ -162,9 +164,13 @@ router.post('/verify-registration', async (req, res) => {
       pending.verificationAttempts = 0;
       await pending.save();
 
+      pending.sessionId = crypto.randomUUID();
+      await pending.save();
+
       // Return token and user info
       res.json({ 
         token: sign(pending), 
+        sessionId: pending.sessionId,
         user: { id: pending._id, name: pending.name, role: pending.role, email: pending.email } 
       });
     } catch (mongoErr) {
@@ -199,10 +205,58 @@ router.post('/login', async (req, res) => {
     }
     if (!(await user.comparePassword(password)))
       return res.status(401).json({ message: 'Invalid credentials' });
-    res.json({ token: sign(user), user: { id: user._id, name: user.name, role: user.role } });
+
+    const oldSessionId = user.sessionId;
+    user.sessionId = crypto.randomUUID();
+    await user.save();
+    const savedUser = await User.findById(user._id).select('_id sessionId').lean();
+    console.log(`[AUTH SESSION SAVED] userId=${savedUser?._id} sessionId=${savedUser?.sessionId}`);
+
+    const activeSessions = req.app.get('activeSessions');
+    const io = req.app.get('io');
+    const userId = user._id.toString();
+    const mappedSession = activeSessions?.get(userId);
+    if (mappedSession) {
+      console.log(`[ACTIVE SESSION BEFORE REPLACEMENT] userId=${userId} sessionId=${mappedSession.sessionId} socketId=${mappedSession.socketId}`);
+    }
+    const oldSocket = mappedSession?.sessionId === oldSessionId
+      ? mappedSession.socket
+      : [...(io?.sockets?.sockets?.values() || [])]
+        .find((socket) => socket.user?.id?.toString() === userId && socket.user?.sessionId === oldSessionId);
+    console.log(`[AUTH LOGIN] userId=${userId} role=${user.role} newSessionId=${user.sessionId}`);
+    if (oldSocket) {
+      console.log(`[OLD SESSION FOUND] userId=${userId} oldSessionId=${oldSocket.user?.sessionId || oldSessionId} oldSocketId=${oldSocket.id}`);
+    }
+    if (oldSocket) {
+      console.log(`[SESSION REPLACED] userId=${userId} oldSessionId=${oldSessionId} newSessionId=${user.sessionId} oldSocketId=${oldSocket.id} newSocketId=pending`);
+      oldSocket.emit('session:revoked', {
+        userId,
+        sessionId: oldSocket.user?.sessionId || oldSessionId,
+        message: 'Your account was signed in on another device.',
+      });
+      console.log(`[SESSION REVOKE SENT] userId=${userId} sessionId=${oldSocket.user?.sessionId || oldSessionId} socketId=${oldSocket.id}`);
+      setTimeout(() => oldSocket.disconnect(true), 100);
+      if (activeSessions?.get(userId)?.socketId === oldSocket.id) activeSessions.delete(userId);
+    }
+    if (oldSessionId) console.log(`[SESSION ROTATED] userId=${user._id}`);
+
+    res.json({ token: sign(user), sessionId: user.sessionId, user: { id: user._id, name: user.name, role: user.role } });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
+});
+
+router.post('/logout', auth, async (req, res) => {
+  await User.findByIdAndUpdate(req.user.id, { $set: { sessionId: null } });
+  const activeSessions = req.app.get('activeSessions');
+  const session = activeSessions?.get(req.user.id.toString());
+  if (session) {
+    session.socket.disconnect(true);
+    if (activeSessions.get(req.user.id.toString())?.socketId === session.socketId) {
+      activeSessions.delete(req.user.id.toString());
+    }
+  }
+  res.json({ message: 'Logged out' });
 });
 
 // Forgot Password - Generate reset code

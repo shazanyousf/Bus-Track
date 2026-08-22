@@ -34,7 +34,7 @@ class _ParentHomeState extends State<ParentHome> {
   void initState() {
     super.initState();
     final parentId = (context.read<AuthService>().user?['_id'] ?? context.read<AuthService>().user?['id'])?.toString();
-    _socket.connect();
+    _socket.connect(token: context.read<AuthService>().token);
     _socket.listenToProfileUpdates((_) {
       if (mounted) _loadData();
     });

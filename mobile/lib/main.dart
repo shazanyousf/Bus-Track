@@ -4,6 +4,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'screens/splash_screen.dart';
+import 'screens/login_screen.dart';
+
+final navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,9 +22,19 @@ class BusTrackApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) => AuthService(onSessionRevoked: () async {
+          final navigator = navigatorKey.currentState;
+          if (navigator == null) return;
+          navigator.pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen(
+              initialMessage: 'Your account was signed in on another device.',
+            )),
+            (_) => false,
+          );
+        })),
       ],
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         title: 'BusTrack School',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(

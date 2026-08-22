@@ -2,17 +2,18 @@ const router = require('express').Router();
 const Bus = require('../models/Bus');
 const auth = require('../middleware/auth');
 
-const optionalAuth = (req, _res, next) => {
+const optionalAuth = async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
-  if (token) {
-    try {
-      const jwt = require('jsonwebtoken');
-      req.user = jwt.verify(token, process.env.JWT_SECRET || 'bustrack_secret');
-    } catch (_) {
-      req.user = null;
+  if (!token) return next();
+  try {
+    req.user = await auth.verifySession(token);
+    next();
+  } catch (error) {
+    if (error.code === 'SESSION_REVOKED') {
+      return res.status(401).json({ message: 'SESSION_REVOKED', code: 'SESSION_REVOKED' });
     }
+    res.status(401).json({ message: 'Invalid token' });
   }
-  next();
 };
 
 router.get('/active-trips', auth, async (req, res) => {

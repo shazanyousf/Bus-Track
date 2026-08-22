@@ -187,7 +187,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   @override
   void initState() {
     super.initState();
-    _socket.connect();
+    _socket.connect(token: context.read<AuthService>().token);
     _socket.listenToProfileUpdates((_) {
       if (mounted) _load();
     });

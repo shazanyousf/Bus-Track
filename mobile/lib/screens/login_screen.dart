@@ -8,7 +8,9 @@ import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.initialMessage});
+
+  final String? initialMessage;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -19,6 +21,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passCtrl  = TextEditingController();
   bool   _obscure  = true;
   String _error    = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _error = widget.initialMessage ?? '';
+  }
 
   Future<void> _login() async {
     setState(() => _error = '');
