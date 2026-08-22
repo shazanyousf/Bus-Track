@@ -44,7 +44,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Future<void> _loadData() async {
     try {
-      final buses = await ApiService.getBuses();
+      final buses = await ApiService.getBuses(token: context.read<AuthService>().token);
       setState(() {
         _buses = buses;
       });
@@ -65,7 +65,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       return;
     }
     if (_nameCtrl.text.trim().isEmpty || _idCtrl.text.trim().isEmpty ||
-        _selectedClass == null) {
+      _phoneCtrl.text.trim().isEmpty || _selectedClass == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Please complete all student fields before submitting'),
@@ -86,8 +86,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         if (_selectedStop != null) 'stop': {
           'name': _selectedStop!['name'],
           'order': _selectedStop!['order'],
-          'latitude': _selectedStop!['latitude'],
-          'longitude': _selectedStop!['longitude'],
         },
         'studentData': {
           'name':       _nameCtrl.text.trim(),
@@ -108,9 +106,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   Map? _initialStopForBus(Map bus) {
-    final route = bus['routeId'] as Map? ?? {};
-    final stops = (route['stops'] as List?) ?? [];
-    return stops.isNotEmpty ? stops.first as Map : null;
+    return null;
   }
 
   void _selectBus(Map bus) {
@@ -225,7 +221,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   selectedClass: _selectedClass,
                   classes: _classes,
                   onClassChanged: (v) => setState(() => _selectedClass = v),
-                  onNext: () => setState(() => _step = 1),
+                  onNext: () {
+                    if (_nameCtrl.text.trim().isEmpty || _idCtrl.text.trim().isEmpty ||
+                        _phoneCtrl.text.trim().isEmpty || _selectedClass == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Please complete all student fields before continuing'),
+                        backgroundColor: Colors.orange,
+                      ));
+                      return;
+                    }
+                    setState(() => _step = 1);
+                  },
                 ),
                 _SelectBusStep(
                   buses:       _buses,
@@ -331,7 +337,7 @@ class _SelectBusStep extends StatelessWidget {
             style: TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
         const SizedBox(height: 20),
         ...buses.map((bus) {
-          final available = bus['availableSeats'] ?? 0;
+          final available = (bus['availableSeats'] as num?)?.toInt() ?? 0;
           final route     = bus['routeId'] as Map? ?? {};
           final isSelected = selectedBus?['_id'] == bus['_id'];
           return GestureDetector(
@@ -388,6 +394,8 @@ class _SelectBusStep extends StatelessWidget {
                               fontWeight: FontWeight.w900)),
                       const Text('seats',
                           style: TextStyle(color: Color(0xFF8892A4), fontSize: 10)),
+                      if (available <= 0)
+                        const Text('FULL', style: TextStyle(color: Color(0xFFE74C3C), fontSize: 10, fontWeight: FontWeight.w800)),
                     ],
                   ),
                 ],
@@ -440,7 +448,8 @@ class _ConfirmStep extends StatelessWidget {
       ['Class',         studentClass ?? 'N/A'],
       ['Bus',          selectedBus?['busNumber'] ?? 'N/A'],
       ['Route',        route['routeName'] ?? 'N/A'],
-      ['Stop',         selectedStop?['name'] ?? 'Not selected'],
+          ['Stop',         selectedStop?['name'] ?? 'Not selected'],
+          ['Monthly Fee',  selectedStop == null ? 'Not selected' : '₹${selectedStop?['monthlyFee'] ?? 0}/month'],
     ];
     final stops = (route['stops'] as List?) ?? [];
     return Column(
@@ -495,7 +504,7 @@ class _ConfirmStep extends StatelessWidget {
                   final stopMap = stop as Map;
                   return DropdownMenuItem<Map?>(
                     value: stopMap,
-                    child: Text(stopMap['name'] ?? 'Unnamed stop'),
+                    child: Text('${stopMap['name'] ?? 'Unnamed stop'} — ₹${stopMap['monthlyFee'] ?? 0}/month'),
                   );
                 }).toList(),
                 onChanged: onStopChanged,

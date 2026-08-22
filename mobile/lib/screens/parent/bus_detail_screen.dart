@@ -276,7 +276,7 @@ class BusDetailScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(stop['name'] ?? '',
+                              child: Text('${stop['name'] ?? ''} — ₹${stop['monthlyFee'] ?? 0}/month',
                                   style: TextStyle(
                                       color: isFirst
                                           ? const Color(0xFFFF6B35)

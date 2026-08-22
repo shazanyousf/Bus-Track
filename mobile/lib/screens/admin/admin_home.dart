@@ -23,6 +23,7 @@ class AdminHome extends StatefulWidget {
 
 class _AdminHomeState extends State<AdminHome> {
   int _currentIndex = 0;
+  String _registrationFilter = 'all';
 
   @override
   Widget build(BuildContext context) {
@@ -30,13 +31,16 @@ class _AdminHomeState extends State<AdminHome> {
       AdminDashboard(
         onOpenBuses: () => setState(() => _currentIndex = 2),
         onOpenRequests: () => setState(() => _currentIndex = 3),
+        onOpenPending: () => setState(() { _registrationFilter = 'pending'; _currentIndex = 3; }),
+        onOpenActive: () => setState(() { _registrationFilter = 'active'; _currentIndex = 3; }),
+        onOpenStudents: () => setState(() => _currentIndex = 3),
         onOpenDrivers: () => setState(() => _currentIndex = 4),
         onManageNotices: () => setState(() => _currentIndex = 6),
         onDownloadReports: () => _downloadReports(),
       ),
       AdminRoutesScreen(onBack: () => setState(() => _currentIndex = 0)),
       AdminBusesScreen(onBack: () => setState(() => _currentIndex = 0)),
-      AdminRequestsScreen(onBack: () => setState(() => _currentIndex = 0)),
+      AdminRequestsScreen(key: ValueKey(_registrationFilter), initialFilter: _registrationFilter, onBack: () => setState(() => _currentIndex = 0)),
       AdminDriversScreen(onBack: () => setState(() => _currentIndex = 0)),
       AdminUsersScreen(onBack: () => setState(() => _currentIndex = 0)),
       NoticesScreen(adminMode: true, onBack: () => setState(() => _currentIndex = 0)),

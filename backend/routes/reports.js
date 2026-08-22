@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const ExcelJS = require('exceljs');
 const Registration = require('../models/Registration');
+const MonthlyPayment = require('../models/MonthlyPayment');
 const auth = require('../middleware/auth');
 
 const csvValue = (value) => {
@@ -68,6 +69,23 @@ const getPaymentReportData = async () => {
     registration.paidAt?.toISOString(),
     registration.status,
   ]);
+  const monthlyPayments = await MonthlyPayment.find()
+    .sort({ paidAt: -1, billingMonth: -1 })
+    .populate('parentId', 'name email')
+    .populate({ path: 'registrationId', populate: [{ path: 'studentId', select: 'name' }, { path: 'busId', select: 'busNumber' }, { path: 'routeId', select: 'routeName' }] });
+  rows.push(...monthlyPayments.map((payment) => [
+    payment.registrationId?.studentId?.name,
+    payment.parentId?.name,
+    payment.parentId?.email,
+    payment.registrationId?.busId?.busNumber,
+    payment.registrationId?.routeId?.routeName,
+    payment.amount,
+    payment.status,
+    payment.razorpayPaymentId,
+    payment.razorpayOrderId,
+    payment.paidAt?.toISOString(),
+    `Monthly ${payment.billingMonth}`,
+  ]));
   const paidRows = rows.filter((row) => row[6] === 'PAID');
   return {
     headers,
@@ -75,7 +93,8 @@ const getPaymentReportData = async () => {
     summary: [
       ['Total payment records', rows.length],
       ['Successful / PAID payments', paidRows.length],
-      ['Pending payments', rows.filter((row) => row[6] === 'PENDING').length],
+      ['Outstanding payments', rows.filter((row) => row[6] === 'PENDING' || row[6] === 'DUE' || row[6] === 'OVERDUE').length],
+      ['Overdue payments', rows.filter((row) => row[6] === 'OVERDUE').length],
       ['Total amount collected', paidRows.reduce((total, row) => total + (Number(row[5]) || 0), 0)],
     ],
   };

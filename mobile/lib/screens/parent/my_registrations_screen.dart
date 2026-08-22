@@ -19,6 +19,8 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
   bool _loading = true;
   bool _paymentLoading = false;
   Map? _paymentRegistration;
+  Map? _monthlyPayment;
+  List _monthlyPayments = [];
 
   @override
   void initState() {
@@ -40,7 +42,8 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
     final auth = context.read<AuthService>();
     try {
       final data = await ApiService.getRegistrations(auth.token!);
-      setState(() { _registrations = data; _loading = false; });
+      final monthly = await ApiService.getMonthlyPayments(auth.token!);
+      setState(() { _registrations = data; _monthlyPayments = monthly; _loading = false; });
     } catch (_) {
       setState(() => _loading = false);
     }
@@ -71,7 +74,30 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
     }
   }
 
+  Future<void> _payMonthly(Map payment) async {
+    try {
+      setState(() { _paymentLoading = true; _monthlyPayment = payment; });
+      final order = await ApiService.payMonthlyPayment(context.read<AuthService>().token!, payment['_id'].toString());
+      _razorpay.open({'key': order['keyId'], 'amount': order['amount'], 'currency': 'INR', 'name': 'BusTrack University', 'description': 'Transport Fee ${payment['billingMonth']}', 'order_id': order['orderId'], 'prefill': {'name': context.read<AuthService>().user?['name'] ?? ''}, 'theme': {'color': '#FF6B35'}});
+    } catch (error) {
+      if (mounted) setState(() { _paymentLoading = false; _monthlyPayment = null; });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Payment failed: $error')));
+    }
+  }
+
   Future<void> _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    final monthlyPayment = _monthlyPayment;
+    if (monthlyPayment != null) {
+      try {
+        await ApiService.verifyMonthlyPayment(context.read<AuthService>().token!, monthlyPayment['_id'].toString(), paymentIdValue: response.paymentId ?? '', orderId: response.orderId ?? '', signature: response.signature ?? '');
+        await _load();
+      } catch (error) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Payment verification failed: $error')));
+      } finally {
+        if (mounted) setState(() { _paymentLoading = false; _monthlyPayment = null; });
+      }
+      return;
+    }
     final registration = _paymentRegistration;
     if (registration == null) return;
     try {
@@ -95,6 +121,7 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
   void _handlePaymentError(PaymentFailureResponse response) {
     _paymentLoading = false;
     _paymentRegistration = null;
+    _monthlyPayment = null;
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Payment failed or cancelled: ${response.message ?? 'Please try again'}')));
   }
@@ -176,6 +203,29 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                               final driver = _safeMap(bus['driverId']);
                               final status = reg['status'] as String? ?? 'pending';
                               final paymentStatus = reg['paymentStatus'] as String? ?? 'PENDING';
+                              final registrationId = reg['_id']?.toString();
+                              final currentMonth = '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
+                              final monthlyForRegistration = _monthlyPayments
+                                  .where((payment) {
+                                  final paymentRegistration = payment['registrationId'];
+                                  final paymentRegistrationId = paymentRegistration is Map
+                                    ? paymentRegistration['_id']
+                                    : paymentRegistration;
+                                  return paymentRegistrationId?.toString() == registrationId;
+                                  })
+                                  .where((payment) => payment['billingMonth']?.toString() == currentMonth)
+                                  .fold<List<Map>>([], (unique, payment) {
+                                    final month = payment['billingMonth']?.toString();
+                                    if (!unique.any((item) => item['billingMonth']?.toString() == month)) {
+                                      unique.add(Map<String, dynamic>.from(payment));
+                                    } else {
+                                      final existing = unique.firstWhere((item) => item['billingMonth']?.toString() == month);
+                                      if (existing['status'] != 'PAID' && payment['status'] == 'PAID') {
+                                        unique[unique.indexOf(existing)] = Map<String, dynamic>.from(payment);
+                                      }
+                                    }
+                                    return unique;
+                                  });
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 14),
                                 padding: const EdgeInsets.all(18),
@@ -219,7 +269,12 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                                         style: const TextStyle(
                                             color: Color(0xFF8892A4), fontSize: 13)),
                                     const SizedBox(height: 8),
-                                    Row(
+                                                              ...monthlyForRegistration.map((payment) => Row(children: [
+                                                                Text('${payment['billingMonth']}: ${payment['status']} — ₹${payment['amount']}', style: TextStyle(color: payment['status'] == 'PAID' ? const Color(0xFF2ECC71) : const Color(0xFFF7C948), fontSize: 12, fontWeight: FontWeight.w700)),
+                                                                const Spacer(),
+                                                                if (payment['status'] == 'DUE' || payment['status'] == 'OVERDUE') TextButton(onPressed: _paymentLoading ? null : () => _payMonthly(payment), child: Text('Pay Now')),
+                                                              ])),
+                                    if (monthlyForRegistration.isEmpty && status == 'approved') Row(
                                       children: [
                                         Icon(paymentStatus == 'PAID' ? Icons.check_circle : Icons.pending,
                                             size: 16, color: paymentStatus == 'PAID' ? const Color(0xFF2ECC71) : const Color(0xFFF7C948)),
@@ -232,7 +287,7 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                                             onPressed: _paymentLoading ? null : () => _pay(reg),
                                             child: _paymentLoading && identical(_paymentRegistration, reg)
                                                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                                : const Text('Pay ₹1,500'),
+                                                : Text('Pay ₹${reg['paymentAmount'] ?? 0}'),
                                           ),
                                       ],
                                     ),

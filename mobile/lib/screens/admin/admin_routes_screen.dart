@@ -86,13 +86,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                       ),
                       _SheetField(ctrl: stop.nameCtrl, label: 'Name', hint: 'e.g. Main Gate'),
                       const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(child: _SheetField(ctrl: stop.latCtrl, label: 'Latitude', hint: 'e.g. 24.8607', type: TextInputType.number)),
-                          const SizedBox(width: 10),
-                          Expanded(child: _SheetField(ctrl: stop.lngCtrl, label: 'Longitude', hint: 'e.g. 67.0011', type: TextInputType.number)),
-                        ],
-                      ),
+                          _SheetField(ctrl: stop.feeCtrl, label: 'Monthly Fee', hint: 'e.g. 1400', type: TextInputType.number),
                     ],
                   ),
                 );
@@ -148,8 +142,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
     final stops = ((route['stops'] as List?) ?? [])
         .map((stop) => _RouteStop(
               name: stop['name']?.toString() ?? '',
-              latitude: stop['latitude']?.toString() ?? '',
-              longitude: stop['longitude']?.toString() ?? '',
+              monthlyFee: stop['monthlyFee']?.toString() ?? '',
             ))
         .toList();
 
@@ -199,13 +192,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                       ),
                       _SheetField(ctrl: stop.nameCtrl, label: 'Name', hint: 'e.g. Main Gate'),
                       const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(child: _SheetField(ctrl: stop.latCtrl, label: 'Latitude', hint: 'e.g. 24.8607', type: TextInputType.number)),
-                          const SizedBox(width: 10),
-                          Expanded(child: _SheetField(ctrl: stop.lngCtrl, label: 'Longitude', hint: 'e.g. 67.0011', type: TextInputType.number)),
-                        ],
-                      ),
+                      _SheetField(ctrl: stop.feeCtrl, label: 'Monthly Fee', hint: 'e.g. 1400', type: TextInputType.number),
                     ],
                   ),
                 );
@@ -365,19 +352,16 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
 
 class _RouteStop {
   final TextEditingController nameCtrl;
-  final TextEditingController latCtrl;
-  final TextEditingController lngCtrl;
+  final TextEditingController feeCtrl;
 
-  _RouteStop({String name = '', String latitude = '', String longitude = ''})
+  _RouteStop({String name = '', String monthlyFee = ''})
       : nameCtrl = TextEditingController(text: name),
-        latCtrl = TextEditingController(text: latitude),
-        lngCtrl = TextEditingController(text: longitude);
+        feeCtrl = TextEditingController(text: monthlyFee);
 
   Map<String, dynamic> toJson(int index) => {
         'order': index + 1,
         'name': nameCtrl.text.trim(),
-        'latitude': double.tryParse(latCtrl.text.trim()) ?? 0.0,
-        'longitude': double.tryParse(lngCtrl.text.trim()) ?? 0.0,
+        'monthlyFee': double.tryParse(feeCtrl.text.trim()) ?? 0.0,
       };
 }
 

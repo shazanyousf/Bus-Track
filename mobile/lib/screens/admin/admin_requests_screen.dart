@@ -4,11 +4,13 @@ import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 import '../../services/notification_service.dart';
+import 'admin_registration_details_screen.dart';
 
 class AdminRequestsScreen extends StatefulWidget {
-  const AdminRequestsScreen({super.key, this.onBack});
+  const AdminRequestsScreen({super.key, this.onBack, this.initialFilter = 'all'});
 
   final VoidCallback? onBack;
+  final String initialFilter;
 
   @override
   State<AdminRequestsScreen> createState() => _AdminRequestsScreenState();
@@ -23,6 +25,7 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
   @override
   void initState() {
     super.initState();
+    _filter = widget.initialFilter;
     _socket.connect(token: context.read<AuthService>().token);
     _socket.listenToProfileUpdates((_) {
       if (mounted) _load();
@@ -36,6 +39,14 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
       if (mounted) _load();
     });
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminRequestsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialFilter != widget.initialFilter) {
+      setState(() => _filter = widget.initialFilter);
+    }
   }
 
   @override
@@ -80,6 +91,29 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bus assigned successfully')));
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Assignment failed: $error')));
+    }
+  }
+
+  Future<void> _removeBus(Map registration) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF16213E),
+        title: const Text('Remove Bus', style: TextStyle(color: Colors.white)),
+        content: const Text('Remove this bus assignment from the student registration? The registration and payment history will be preserved.', style: TextStyle(color: Color(0xFF8892A4))),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove Bus', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ApiService.removeRegistrationBus(context.read<AuthService>().token!, registration['_id'].toString());
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bus assignment removed; payment history preserved')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to remove bus: $error')));
     }
   }
 
@@ -318,6 +352,11 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
                                                 fontWeight: FontWeight.w700),
                                           ),
                                         ),
+                                        IconButton(
+                                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AdminRegistrationDetailsScreen(registration: reg))),
+                                          icon: const Icon(Icons.open_in_new_rounded, color: Color(0xFF4A9EFF), size: 19),
+                                          tooltip: 'View registration details',
+                                        ),
                                       ],
                                     ),
                                     const SizedBox(height: 14),
@@ -374,8 +413,10 @@ class _AdminRequestsScreenState extends State<AdminRequestsScreen> {
                                         Text(paymentStatus == 'PAID' ? 'Payment: PAID ✓' : 'Payment: PENDING',
                                             style: TextStyle(color: paymentStatus == 'PAID' ? const Color(0xFF2ECC71) : const Color(0xFFF7C948), fontSize: 12, fontWeight: FontWeight.w700)),
                                         const Spacer(),
-                                        if (status == 'approved' && paymentStatus == 'PAID')
+                                        if (status == 'approved' && paymentStatus == 'PAID' && reg['busId'] == null)
                                           TextButton.icon(onPressed: () => _assignBus(reg), icon: const Icon(Icons.directions_bus, size: 16), label: const Text('Assign Bus')),
+                                        if (status == 'active' && reg['busId'] != null)
+                                          TextButton.icon(onPressed: () => _removeBus(reg), icon: const Icon(Icons.remove_circle_outline, size: 16), label: const Text('Remove Bus')),
                                       ],
                                     ),
                                     if (status == 'pending' || status == 'approved') ...[

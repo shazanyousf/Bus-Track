@@ -276,6 +276,13 @@ class ApiService {
     return body;
   }
 
+  static Future<Map> removeRegistrationBus(String token, String id) async {
+    final res = await http.put(Uri.parse('$baseUrl/registrations/$id/remove-bus'), headers: headers(token)).timeout(_timeout);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(body['message'] ?? 'Failed to remove bus assignment');
+    return body;
+  }
+
   static Future<Map> payRegistration(String token, String id) async {
     final res = await http.post(Uri.parse('$baseUrl/registrations/$id/payment/order'),
         headers: headers(token)).timeout(_timeout);
@@ -301,6 +308,40 @@ class ApiService {
     if (res.statusCode != 200) {
       throw Exception(body['message'] ?? 'Payment verification failed');
     }
+    return body;
+  }
+
+  static Future<List> getMonthlyPayments(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/registrations/monthly-payments'), headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to load monthly payments');
+  }
+
+  static Future<Map> advanceBillingMonth(String token) async {
+    final res = await http.post(Uri.parse('$baseUrl/registrations/monthly-payments/advance'), headers: headers(token)).timeout(_timeout);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(body['message'] ?? 'Failed to advance billing month');
+    return body;
+  }
+
+  static Future<Map> resetMonthlyPayment(String token, String registrationId, {String? billingMonth}) async {
+    final res = await http.post(Uri.parse('$baseUrl/registrations/$registrationId/monthly-payment/reset'), headers: headers(token), body: jsonEncode({'billingMonth': billingMonth})).timeout(_timeout);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(body['message'] ?? 'Failed to reset monthly payment');
+    return body;
+  }
+
+  static Future<Map> payMonthlyPayment(String token, String paymentId) async {
+    final res = await http.post(Uri.parse('$baseUrl/registrations/monthly-payments/$paymentId/order'), headers: headers(token)).timeout(_timeout);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(body['message'] ?? 'Failed to start monthly payment');
+    return body;
+  }
+
+  static Future<Map> verifyMonthlyPayment(String token, String paymentId, {required String paymentIdValue, required String orderId, required String signature}) async {
+    final res = await http.post(Uri.parse('$baseUrl/registrations/monthly-payments/$paymentId/verify'), headers: headers(token), body: jsonEncode({'razorpay_payment_id': paymentIdValue, 'razorpay_order_id': orderId, 'razorpay_signature': signature})).timeout(_timeout);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(body['message'] ?? 'Monthly payment verification failed');
     return body;
   }
 

@@ -11,6 +11,9 @@ class AdminDashboard extends StatefulWidget {
     super.key,
     required this.onOpenBuses,
     required this.onOpenRequests,
+    required this.onOpenPending,
+    required this.onOpenActive,
+    required this.onOpenStudents,
     required this.onOpenDrivers,
     required this.onManageNotices,
     required this.onDownloadReports,
@@ -18,6 +21,9 @@ class AdminDashboard extends StatefulWidget {
 
   final VoidCallback onOpenBuses;
   final VoidCallback onOpenRequests;
+  final VoidCallback onOpenPending;
+  final VoidCallback onOpenActive;
+  final VoidCallback onOpenStudents;
   final VoidCallback onOpenDrivers;
   final VoidCallback onManageNotices;
   final VoidCallback onDownloadReports;
@@ -87,11 +93,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
               _SectionTitle(title: 'At a glance', subtitle: 'Live transport operations overview'),
               const SizedBox(height: 12),
               _SummaryGrid(items: [
-                _SummaryItem('Students', _number('students'), Icons.school_rounded, _blue),
+                _SummaryItem('Students', _number('students'), Icons.school_rounded, _blue, widget.onOpenStudents),
                 _SummaryItem('Buses', _number('buses'), Icons.directions_bus_rounded, _orange),
                 _SummaryItem('Drivers', _number('drivers'), Icons.badge_rounded, _purple),
-                _SummaryItem('Pending requests', _number('pendingRegistrations'), Icons.hourglass_top_rounded, _yellow),
-                _SummaryItem('Active registrations', _number('activeRegistrations'), Icons.verified_rounded, _green),
+                _SummaryItem('Pending requests', _number('pendingRegistrations'), Icons.hourglass_top_rounded, _yellow, widget.onOpenPending),
+                _SummaryItem('Active registrations', _number('activeRegistrations'), Icons.verified_rounded, _green, widget.onOpenActive),
                 _SummaryItem('Tracking now', _number('trackingBuses'), Icons.location_on_rounded, _teal),
               ]),
               const SizedBox(height: 24),
@@ -204,8 +210,9 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _SummaryItem {
-  const _SummaryItem(this.label, this.value, this.icon, this.color);
+  const _SummaryItem(this.label, this.value, this.icon, this.color, [this.onTap]);
   final String label; final int value; final IconData icon; final Color color;
+  final VoidCallback? onTap;
 }
 
 class _SummaryGrid extends StatelessWidget {
@@ -215,7 +222,7 @@ class _SummaryGrid extends StatelessWidget {
   Widget build(BuildContext context) => GridView.builder(
     shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: items.length,
     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.55),
-    itemBuilder: (_, index) { final item = items[index]; return Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: _navy, borderRadius: BorderRadius.circular(14), border: Border.all(color: _border)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Icon(item.icon, color: item.color, size: 20), Text('${item.value}', style: TextStyle(color: item.color, fontSize: 25, fontWeight: FontWeight.w800)), Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w600))])); },
+    itemBuilder: (_, index) { final item = items[index]; return InkWell(onTap: item.onTap, borderRadius: BorderRadius.circular(14), child: Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: _navy, borderRadius: BorderRadius.circular(14), border: Border.all(color: _border)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Icon(item.icon, color: item.color, size: 20), Text('${item.value}', style: TextStyle(color: item.color, fontSize: 25, fontWeight: FontWeight.w800)), Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w600))]))); },
   );
 }
 
