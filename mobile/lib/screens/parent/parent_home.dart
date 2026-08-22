@@ -154,10 +154,16 @@ class _ParentHomeState extends State<ParentHome> {
         },
       ),
       approved.isNotEmpty
-          ? _AssignedBusPage(registration: approved.first)
-          : const BusListScreen(),
-      RegistrationScreen(onDone: () => setState(() => _currentIndex = 0)),
-      const MyRegistrationsScreen(),
+          ? _AssignedBusPage(
+              registration: approved.first,
+              onBack: () => setState(() => _currentIndex = 0),
+            )
+          : BusListScreen(onBack: () => setState(() => _currentIndex = 0)),
+      RegistrationScreen(
+        onDone: () => setState(() => _currentIndex = 0),
+        onBack: () => setState(() => _currentIndex = 0),
+      ),
+      MyRegistrationsScreen(onBack: () => setState(() => _currentIndex = 0)),
     ];
 
     return Scaffold(
@@ -672,7 +678,8 @@ class _AssignedBusCard extends StatelessWidget {
 
 class _AssignedBusPage extends StatelessWidget {
   final Map registration;
-  const _AssignedBusPage({required this.registration});
+  final VoidCallback? onBack;
+  const _AssignedBusPage({required this.registration, this.onBack});
 
   Map _safeMap(dynamic value) {
     if (value is Map) return value as Map;
@@ -714,6 +721,15 @@ class _AssignedBusPage extends StatelessWidget {
           children: [
             Row(
               children: [
+                if (onBack != null)
+                  IconButton(
+                    onPressed: onBack,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    tooltip: 'Back to home',
+                  ),
+                if (onBack != null) const SizedBox(width: 4),
                 const Icon(Icons.directions_bus_rounded, color: Color(0xFFFF6B35), size: 28),
                 const SizedBox(width: 12),
                 Expanded(

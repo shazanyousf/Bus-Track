@@ -264,18 +264,6 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
                             color: Color(0xFF8892A4), fontSize: 13)),
                   ],
                 ),
-                ElevatedButton.icon(
-                  onPressed: _showAddDriverDialog,
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Add Driver'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B35),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                ),
               ],
             ),
           ),

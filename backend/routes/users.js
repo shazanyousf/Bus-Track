@@ -3,6 +3,37 @@ const User = require('../models/User');
 const Driver = require('../models/Driver');
 const auth = require('../middleware/auth');
 
+const syncDriverForUser = async (user, previousRole) => {
+  const wasDriver = previousRole === 'driver';
+  if (user.role === 'driver') {
+    let driver = await Driver.findOne({ userId: user._id });
+    if (!driver && user.phone) driver = await Driver.findOne({ phone: user.phone, userId: null });
+    if (driver) {
+      driver.userId = user._id;
+      driver.name = user.name;
+      driver.phone = user.phone;
+      driver.email = user.email;
+      driver.status = 'active';
+      await driver.save();
+    } else {
+      await Driver.create({
+        userId: user._id,
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        licenseNo: null,
+        status: 'active',
+      });
+    }
+  } else if (wasDriver) {
+    const driver = await Driver.findOne({ userId: user._id });
+    if (driver) {
+      driver.status = 'inactive';
+      await driver.save();
+    }
+  }
+};
+
 // List all users (admin only)
 router.get('/', auth, auth.adminOnly, async (req, res) => {
   try {
@@ -21,12 +52,8 @@ router.put('/:id([0-9a-fA-F]{24})', auth, auth.adminOnly, async (req, res) => {
     for (const k of allowed) if (k in req.body) update[k] = req.body[k];
     const previousUser = await User.findById(req.params.id).select('name phone role');
     const user = await User.findByIdAndUpdate(req.params.id, update, { new: true }).select('-password -verificationCode -resetCode');
-    if (user?.role === 'driver' && previousUser?.phone) {
-      await Driver.findOneAndUpdate(
-        { phone: previousUser.phone },
-        { name: user.name, phone: user.phone },
-      );
-    }
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    await syncDriverForUser(user, previousUser?.role);
     req.app.get('io')?.emit('profile:updated', { userId: user._id.toString(), role: user.role });
     res.json(user);
   } catch (e) {
@@ -66,8 +93,8 @@ router.put('/me', auth, async (req, res) => {
     const user = await User.findByIdAndUpdate(req.user.id, update, { new: true }).select('-password -verificationCode -resetCode');
     if (user?.role === 'driver' && previousUser?.phone) {
       await Driver.findOneAndUpdate(
-        { phone: previousUser.phone },
-        { name: user.name, phone: user.phone },
+        { $or: [{ userId: user._id }, { phone: previousUser.phone }] },
+        { userId: user._id, name: user.name, phone: user.phone, email: user.email },
       );
     }
     req.app.get('io')?.emit('profile:updated', { userId: user._id.toString(), role: user.role });

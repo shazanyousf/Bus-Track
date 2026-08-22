@@ -5,7 +5,9 @@ import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 
 class MyRegistrationsScreen extends StatefulWidget {
-  const MyRegistrationsScreen({super.key});
+  const MyRegistrationsScreen({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<MyRegistrationsScreen> createState() => _MyRegistrationsScreenState();
@@ -119,14 +121,27 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            child: Column(
+            padding: const EdgeInsets.fromLTRB(12, 12, 20, 16),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('My Requests',
-                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
-                Text('${_registrations.length} total registrations',
-                    style: const TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
+                IconButton(
+                  onPressed: widget.onBack,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  tooltip: 'Back to home',
+                ),
+                const SizedBox(width: 4),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('My Requests',
+                        style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                    Text('${_registrations.length} total registrations',
+                        style: const TextStyle(color: Color(0xFF8892A4), fontSize: 13)),
+                  ],
+                ),
               ],
             ),
           ),

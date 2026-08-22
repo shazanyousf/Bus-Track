@@ -6,7 +6,9 @@ import '../../services/socket_service.dart';
 import 'bus_detail_screen.dart';
 
 class BusListScreen extends StatefulWidget {
-  const BusListScreen({super.key});
+  const BusListScreen({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<BusListScreen> createState() => _BusListScreenState();
@@ -74,11 +76,24 @@ class _BusListScreenState extends State<BusListScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Available Buses',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800)),
+                Row(
+                  children: [
+                    if (widget.onBack != null)
+                      IconButton(
+                        onPressed: widget.onBack,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                        tooltip: 'Back to home',
+                      ),
+                    if (widget.onBack != null) const SizedBox(width: 4),
+                    const Text('Available Buses',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800)),
+                  ],
+                ),
                 const SizedBox(height: 4),
                 Text('${_buses.length} buses found',
                     style: const TextStyle(

@@ -46,6 +46,8 @@ class BusDetailScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFF16213E),
         foregroundColor: Colors.white,
+        leadingWidth: 44,
+        titleSpacing: 0,
         title: Text(bus['busNumber'] ?? 'Bus Detail',
             style: const TextStyle(fontWeight: FontWeight.w800)),
         elevation: 0,

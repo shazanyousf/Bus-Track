@@ -377,6 +377,16 @@ async function reconcileBusSeats() {
   console.log(`🪑 Reconciled seats for ${buses.length} bus(es)`);
 }
 
+async function ensureDriverIndexes() {
+  const indexes = await Driver.collection.indexes().catch(() => []);
+  const licenseIndex = indexes.find((index) => index.key?.licenseNo === 1);
+  if (licenseIndex?.unique && !licenseIndex.sparse) {
+    await Driver.collection.dropIndex(licenseIndex.name);
+    await Driver.collection.createIndex({ licenseNo: 1 }, { unique: true, sparse: true });
+  }
+  await Driver.init();
+}
+
 async function hydrateActiveTrips() {
   const buses = await Bus.find({ tripStatus: 'ACTIVE', trackingStatus: 'LIVE' }).select('_id tripId routeId tripStartedAt currentLocation').lean();
   buses.forEach((bus) => {
@@ -407,7 +417,7 @@ async function hydrateActiveTrips() {
 mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected');
-    return reconcileBusSeats().then(hydrateActiveTrips);
+    return ensureDriverIndexes().then(reconcileBusSeats).then(hydrateActiveTrips);
   })
   .then(() => {
     

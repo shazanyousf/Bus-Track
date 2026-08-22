@@ -6,8 +6,9 @@ import '../../services/api_service.dart';
 class RegistrationScreen extends StatefulWidget {
   final Map? preselectedBus;
   final VoidCallback? onDone;
+  final VoidCallback? onBack;
 
-  const RegistrationScreen({super.key, this.preselectedBus, this.onDone});
+  const RegistrationScreen({super.key, this.preselectedBus, this.onDone, this.onBack});
 
   @override
   State<RegistrationScreen> createState() => _RegistrationScreenState();
@@ -137,6 +138,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF16213E),
         foregroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+        leadingWidth: 44,
+        leading: widget.onBack == null
+            ? null
+            : IconButton(
+                onPressed: widget.onBack,
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: 'Back to home',
+              ),
+        titleSpacing: 0,
         title: const Text('Bus Registration',
             style: TextStyle(fontWeight: FontWeight.w800)),
         elevation: 0,
