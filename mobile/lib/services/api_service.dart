@@ -345,6 +345,42 @@ class ApiService {
     return body;
   }
 
+  // ── Support queries ─────────────────────────────────────
+  static Future<List> getSupportQueries(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/support'), headers: headers(token)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Failed to load support queries');
+  }
+
+  static Future<Map> createSupportQuery(
+    String token, {
+    required String subject,
+    required String message,
+    List<int>? attachmentBytes,
+    String? attachmentName,
+  }) async {
+    final req = http.MultipartRequest('POST', Uri.parse('$baseUrl/support'))
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['subject'] = subject
+      ..fields['message'] = message;
+    if (attachmentBytes != null && attachmentBytes.isNotEmpty) {
+      req.files.add(http.MultipartFile.fromBytes(
+        'attachment', attachmentBytes, filename: attachmentName ?? 'attachment.bin'));
+    }
+    final res = await http.Response.fromStream(await req.send().timeout(_timeout));
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 201) throw Exception(body['message'] ?? 'Failed to raise query');
+    return Map<String, dynamic>.from(body);
+  }
+
+  static Future<Map> replyToSupportQuery(String token, String id, String response, {bool resolved = true}) async {
+    final res = await http.put(Uri.parse('$baseUrl/support/$id/reply'),
+        headers: headers(token), body: jsonEncode({'response': response, 'status': resolved ? 'resolved' : 'open'})).timeout(_timeout);
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(body['message'] ?? 'Failed to send response');
+    return Map<String, dynamic>.from(body);
+  }
+
   static Future<Map> assignRegistration(String token, String id, String busId,
       {String? routeId}) async {
     final res = await http.put(Uri.parse('$baseUrl/registrations/$id/assignment'),

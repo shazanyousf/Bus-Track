@@ -12,6 +12,7 @@ import 'my_registrations_screen.dart';
 import 'live_tracking_screen.dart';
 import '../account_screen.dart';
 import '../shared/notices_screen.dart';
+import '../shared/support_screen.dart';
 
 class ParentHome extends StatefulWidget {
   const ParentHome({super.key});
@@ -152,6 +153,7 @@ class _ParentHomeState extends State<ParentHome> {
             MaterialPageRoute(builder: (_) => const NoticesScreen()),
           );
         },
+        onOpenSupport: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ParentSupportScreen())),
       ),
       approved.isNotEmpty
           ? _AssignedBusPage(
@@ -212,6 +214,7 @@ class _DashboardTab extends StatelessWidget {
   final VoidCallback onViewBuses;
   final VoidCallback onOpenPending;
   final VoidCallback onOpenNotices;
+  final VoidCallback onOpenSupport;
 
   const _DashboardTab({
     required this.userName,
@@ -225,6 +228,7 @@ class _DashboardTab extends StatelessWidget {
     required this.onViewBuses,
     required this.onOpenPending,
     required this.onOpenNotices,
+    required this.onOpenSupport,
   });
 
   @override
@@ -280,8 +284,6 @@ class _DashboardTab extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 12),
-
               // Header
               Container(
                 padding: const EdgeInsets.all(16),
@@ -380,6 +382,13 @@ class _DashboardTab extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              _ActionButton(
+                icon: Icons.support_agent_rounded,
+                label: 'Raise a Query',
+                color: const Color(0xFF45D6C8),
+                onTap: onOpenSupport,
               ),
             ],
           ),

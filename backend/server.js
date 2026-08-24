@@ -46,6 +46,7 @@ app.use('/api/routes',        require('./routes/busRoutes'));
 app.use('/api/settings',      require('./routes/settings'));
 app.use('/api/students',      require('./routes/students'));
 app.use('/api/notices',       require('./routes/notices'));
+app.use('/api/support',       require('./routes/support'));
 app.use('/api/users',         require('./routes/users'));
 app.use('/api/admin',         require('./routes/admin'));
 app.use('/api/reports',       require('./routes/reports'));
@@ -53,7 +54,7 @@ app.use('/api/reports',       require('./routes/reports'));
 app.get('/api', (req, res) =>
   res.json({
     message: 'BusTrack School API is running',
-    routes: ['/api/auth', '/api/buses', '/api/drivers', '/api/routes', '/api/registrations', '/api/settings', '/api/students', '/api/notices']
+    routes: ['/api/auth', '/api/buses', '/api/drivers', '/api/routes', '/api/registrations', '/api/settings', '/api/students', '/api/notices', '/api/support']
   })
 );
 

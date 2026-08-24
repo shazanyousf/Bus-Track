@@ -13,6 +13,7 @@ import 'admin_routes_screen.dart';
 import 'admin_users_screen.dart';
 import '../shared/notices_screen.dart';
 import 'admin_dashboard.dart';
+import '../shared/support_screen.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
@@ -44,6 +45,7 @@ class _AdminHomeState extends State<AdminHome> {
       AdminDriversScreen(onBack: () => setState(() => _currentIndex = 0)),
       AdminUsersScreen(onBack: () => setState(() => _currentIndex = 0)),
       NoticesScreen(adminMode: true, onBack: () => setState(() => _currentIndex = 0)),
+      AdminSupportScreen(onBack: () => setState(() => _currentIndex = 0)),
     ];
 
     return Scaffold(
@@ -76,6 +78,7 @@ class _AdminHomeState extends State<AdminHome> {
             BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Drivers'),
             BottomNavigationBarItem(icon: Icon(Icons.group_rounded), label: 'Users'),
             BottomNavigationBarItem(icon: Icon(Icons.campaign_rounded), label: 'Notices'),
+            BottomNavigationBarItem(icon: Icon(Icons.support_agent_rounded), label: 'Support'),
           ],
         ),
       ),
