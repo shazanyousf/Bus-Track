@@ -25,6 +25,7 @@ class _ParentHomeState extends State<ParentHome> {
     final SocketService _socket = SocketService();
   int _currentIndex = 0;
   List _registrations = [];
+  List _monthlyPayments = [];
   List _activeTrips = [];
   final Map<String, Map<String, dynamic>> _liveLocations = {};
   final Set<String> _completedBusIds = {};
@@ -90,6 +91,12 @@ class _ParentHomeState extends State<ParentHome> {
     debugPrint('Flutter Socket URL = ${_socket.socketUrl}');
     try {
       final regs = await ApiService.getRegistrations(auth.token!);
+      List monthlyPayments = [];
+      try {
+        monthlyPayments = await ApiService.getMonthlyPayments(auth.token!);
+      } catch (error) {
+        debugPrint('[PARENT PAYMENTS FETCH] error = $error');
+      }
       final assignedBusIds = regs
           .where((registration) => registration['status'] == 'active')
           .map((registration) => registration['busId']?['_id']?.toString())
@@ -105,6 +112,7 @@ class _ParentHomeState extends State<ParentHome> {
       }
       setState(() {
         _registrations = regs;
+        _monthlyPayments = monthlyPayments;
         _loading = false;
       });
       debugPrint('[PARENT REGISTRATION STATE] count=${_registrations.length}');
@@ -139,6 +147,7 @@ class _ParentHomeState extends State<ParentHome> {
       _DashboardTab(
         userName: auth.user?['name'] ?? 'Parent',
         approved: approved,
+        monthlyPayments: _monthlyPayments,
         activeTrips: _activeTrips,
         liveLocations: _liveLocations,
         completedBusIds: _completedBusIds,
@@ -157,7 +166,11 @@ class _ParentHomeState extends State<ParentHome> {
       ),
       approved.isNotEmpty
           ? _AssignedBusPage(
-              registration: approved.first,
+              registrations: approved,
+              monthlyPayments: _monthlyPayments,
+              activeTrips: _activeTrips,
+              liveLocations: _liveLocations,
+              completedBusIds: _completedBusIds,
               onBack: () => setState(() => _currentIndex = 0),
             )
           : BusListScreen(onBack: () => setState(() => _currentIndex = 0)),
@@ -205,6 +218,7 @@ class _ParentHomeState extends State<ParentHome> {
 class _DashboardTab extends StatelessWidget {
   final String userName;
   final List approved;
+  final List monthlyPayments;
   final List activeTrips;
   final Map<String, Map<String, dynamic>> liveLocations;
   final Set<String> completedBusIds;
@@ -219,6 +233,7 @@ class _DashboardTab extends StatelessWidget {
   const _DashboardTab({
     required this.userName,
     required this.approved,
+    required this.monthlyPayments,
     required this.activeTrips,
     required this.liveLocations,
     required this.completedBusIds,
@@ -325,12 +340,16 @@ class _DashboardTab extends StatelessWidget {
                   subtitle: 'Your approved bus and driver details',
                 ),
                 const SizedBox(height: 12),
-                _AssignedBusCard(
-                  registration: approved.first,
-                  activeTrips: activeTrips,
-                  liveLocations: liveLocations,
-                  completedBusIds: completedBusIds,
-                ),
+                ...approved.map((registration) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _AssignedBusCard(
+                    registration: registration,
+                    monthlyPayments: monthlyPayments,
+                    activeTrips: activeTrips,
+                    liveLocations: liveLocations,
+                    completedBusIds: completedBusIds,
+                  ),
+                )),
                 const SizedBox(height: 24),
               ],
 
@@ -499,12 +518,14 @@ class _SectionHeader extends StatelessWidget {
 
 class _AssignedBusCard extends StatelessWidget {
   final Map registration;
+  final List monthlyPayments;
   final List activeTrips;
   final Map<String, Map<String, dynamic>> liveLocations;
   final Set<String> completedBusIds;
 
   const _AssignedBusCard({
     required this.registration,
+    required this.monthlyPayments,
     required this.activeTrips,
     required this.liveLocations,
     required this.completedBusIds,
@@ -562,6 +583,16 @@ class _AssignedBusCard extends StatelessWidget {
       (trip) => trip['busId']?.toString() == busId,
     ).toList();
     final activeTrip = matchingTrips.isEmpty ? null : matchingTrips.first;
+    final registrationId = registration['_id']?.toString();
+    final currentMonth = '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
+    final monthlyPayment = monthlyPayments.cast<Map>().where((payment) {
+      final paymentRegistration = payment['registrationId'];
+      final paymentRegistrationId = paymentRegistration is Map
+        ? paymentRegistration['_id']
+        : paymentRegistration;
+      return paymentRegistrationId?.toString() == registrationId &&
+        payment['billingMonth']?.toString() == currentMonth;
+    }).firstOrNull;
     final location = busId == null ? null : liveLocations[busId];
     final hasLocation = location != null &&
       (location['lat'] is num || location['latitude'] is num) &&
@@ -639,6 +670,25 @@ class _AssignedBusCard extends StatelessWidget {
           const SizedBox(height: 14),
           const Divider(color: Color(0xFF2A3A5C)),
           const SizedBox(height: 10),
+          if (monthlyPayment != null) ...[
+            Row(
+              children: [
+                const Icon(Icons.payments_rounded, color: Color(0xFFF7C948), size: 18),
+                const SizedBox(width: 8),
+                Text('Fee: ₹${monthlyPayment['amount'] ?? 0}', style: const TextStyle(color: Color(0xFF8892A4), fontSize: 12)),
+                const Spacer(),
+                Text(
+                  monthlyPayment['status'] == 'PAID' ? 'PAID' : monthlyPayment['status'] == 'OVERDUE' ? 'OVERDUE' : 'PENDING',
+                  style: TextStyle(
+                    color: monthlyPayment['status'] == 'PAID' ? const Color(0xFF2ECC71) : monthlyPayment['status'] == 'OVERDUE' ? const Color(0xFFE74C3C) : const Color(0xFFF7C948),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
           Row(
             children: [
               Container(
@@ -686,9 +736,20 @@ class _AssignedBusCard extends StatelessWidget {
 }
 
 class _AssignedBusPage extends StatelessWidget {
-  final Map registration;
+  final List registrations;
+  final List monthlyPayments;
+  final List activeTrips;
+  final Map<String, Map<String, dynamic>> liveLocations;
+  final Set<String> completedBusIds;
   final VoidCallback? onBack;
-  const _AssignedBusPage({required this.registration, this.onBack});
+  const _AssignedBusPage({
+    required this.registrations,
+    required this.monthlyPayments,
+    required this.activeTrips,
+    required this.liveLocations,
+    required this.completedBusIds,
+    this.onBack,
+  });
 
   Map _safeMap(dynamic value) {
     if (value is Map) return value as Map;
@@ -713,18 +774,38 @@ class _AssignedBusPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bus    = _safeMap(registration['busId']);
-    final route  = _safeMap(registration['routeId']).isNotEmpty
-        ? _safeMap(registration['routeId'])
-        : _safeMap(bus['routeId']);
-    final driver = _safeMap(bus['driverId']);
-    final stops  = (route['stops'] as List?) ?? [];
-    debugPrint('[PARENT ASSIGNED PAGE RENDER] assignedBus=$bus assignedBusId=${bus['_id']} busNumber=${bus['busNumber']} shouldRender=${bus.isNotEmpty && bus['_id'] != null}');
-
     return SafeArea(
-      child: SingleChildScrollView(
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),
+        children: [
+          Row(
+            children: [
+              if (onBack != null)
+                IconButton(
+                  onPressed: onBack,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  tooltip: 'Back to home',
+                ),
+              const SizedBox(width: 8),
+              const Text('My Buses', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...registrations.map((registration) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _AssignedBusCard(
+              registration: registration,
+              monthlyPayments: monthlyPayments,
+              activeTrips: activeTrips,
+              liveLocations: liveLocations,
+              completedBusIds: completedBusIds,
+            ),
+          )),
+        ],
+        /*
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -840,7 +921,7 @@ class _AssignedBusPage extends StatelessWidget {
               ),
             ),
           ],
-        ),
+        ),*/
       ),
     );
   }
