@@ -73,7 +73,7 @@ bustrack/
 - **Flutter SDK** 3.x
 - **MongoDB** Atlas or local MongoDB instance (required for full functionality)
 - **Android Studio** or **Xcode** for building mobile apps
-- **Email Service** (SMTP) - optional, required for registration and password reset emails
+- **Email Service** (Brevo) - optional, required for registration and password reset emails
 - **Razorpay Account** - optional, required for payment processing features
 
 ## Backend Setup
@@ -102,23 +102,8 @@ MONGODB_URI=mongodb://localhost:27017/bustrack_school
 # Authentication
 JWT_SECRET=your_secret_key_here
 
-# Email Service (Optional - required for registration/password reset emails)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-EMAIL_FROM=your-email@gmail.com
 
-# Payment Gateway (Optional - required for Razorpay integration)
-RAZORPAY_KEY_ID=your_razorpay_key
-RAZORPAY_KEY_SECRET=your_razorpay_secret
-```
 
-**Notes:**
-- SMTP configuration is optional but required if you want registration verification and password reset emails
-- Razorpay configuration is optional and only needed for payment features
-- Use app-specific passwords for Gmail SMTP (not your regular password)
 
 ## Mobile Setup
 
